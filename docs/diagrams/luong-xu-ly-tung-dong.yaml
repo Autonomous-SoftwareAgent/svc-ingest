@@ -5,6 +5,35 @@ tab: "business"
 sources:
   - "src/ingest/normalize/inventory_rates_json.py"
   - "src/ingest/core/service.py"
+explain:
+  meaning: "Một lần gửi của nhà cung cấp gồm nhiều dòng theo ngày của nhiều phòng. Sơ đồ cho thấy Ingest xử lý từng dòng thế nào để một dòng sai không làm hỏng cả lần gửi: dòng sai bị bỏ và báo lại, phần hợp lệ vẫn đi tiếp."
+  read:
+    - "Đọc từ trên xuống; ô hình thoi là điểm quyết định, nhãn trên mũi tên là câu trả lời."
+    - "Ô vàng là chỗ một phần dữ liệu bị bỏ kèm mã lỗi; ô đỏ là chỗ cả lần gửi bị từ chối."
+    - "Mọi nhánh đều đổ về câu hỏi cuối: sau khi bỏ các phần sai, lần gửi còn message nào không."
+  details:
+    - term: "Một dòng date của một phòng"
+      text: "Đơn vị xử lý là một phần tử date của một phòng trong gói. Phòng hỏng cấu trúc thì cả phòng đó bị bỏ."
+    - term: "Ngày và số liệu hợp lệ"
+      text: "Dòng có ngày sai, số âm hoặc cấu trúc sai thì bị bỏ với lỗi mã 20; các dòng khác vẫn đi. Dòng có điều kiện bán hoặc giá mà thiếu mã gói giá cũng bị bỏ cả dòng với mã 20, kể cả phần tồn."
+    - term: "Tách khoảng ngày theo thứ trong tuần"
+      text: "Khoảng ngày được tách theo các thứ được chọn. Trường nào nhà cung cấp không gửi thì bỏ qua, không hiểu là 0."
+    - term: "Mã phòng nhận ra"
+      text: "Mã phòng của nhà cung cấp phải đổi được sang mã nội bộ. Mã lạ thì bỏ mọi cập nhật của phòng đó, lỗi mã 10."
+    - term: "Tạo message tồn"
+      text: "Chỉ tạo khi dòng có gửi số phòng còn bán. Message tồn chỉ cần mã phòng, không cần gói giá."
+    - term: "Mã gói giá nhận ra"
+      text: "Gói giá lạ thì bỏ điều kiện bán và giá (lỗi mã 10) nhưng vẫn giữ message tồn."
+    - term: "Từ chối cả lần gửi"
+      text: "Không còn message hợp lệ nào: trả lỗi mã 12 và không lưu gì, nên cùng X-Trace-Id gửi lại được bản đã sửa."
+    - term: "Ghi outbox, commit, trả 202"
+      text: "Phần hợp lệ được lưu bền rồi mới báo đã nhận, kèm danh sách dòng bị bỏ và lý do."
+  pitfalls:
+    - "202 không có nghĩa là mọi dòng đều được nhận: phải đọc danh sách dòng bị bỏ trong câu trả lời."
+    - "Có những lỗi làm hỏng cả lần gửi mà sơ đồ này không vẽ: gói không đọc được hoặc thiếu khách sạn, phòng (mã 21); quá nhiều cập nhật sau khi tách (mã 24, HTTP 413); khách sạn lạ hoặc không có quyền (mã 31, HTTP 401)."
+    - "Chỉ mã 10 do nghiệp vụ quy định; mã 12 và 20 do Ingest tự đặt, chưa thỏa thuận với nhà cung cấp."
+    - "Dạng gói và quy ước thứ trong tuần theo mô tả của người dùng; ngày tính cả hai đầu là giả định của Ingest. Cả hai chưa kiểm với nhà cung cấp thật."
+  basis: "eacab43e164dfc66"
 direction: "TB"
 groups: []
 nodes:

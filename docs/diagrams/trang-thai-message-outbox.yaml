@@ -5,6 +5,27 @@ tab: "architecture"
 sources:
   - "src/ingest/core/relay.py"
   - "src/ingest/core/schema.py"
+explain:
+  meaning: "Mỗi message được ghi vào outbox trước, rồi một tác vụ nền (relay) gửi nó lên Kafka. Sơ đồ cho thấy một message đi qua những giai đoạn nào và vì sao bên nhận có thể thấy cùng một message hai lần."
+  read:
+    - "Đọc từ trái sang phải; chấm đen là lúc message được ghi, chấm có viền là lúc xong."
+    - "Nhãn trên mũi tên là điều làm message chuyển giai đoạn."
+    - "Mũi tên từ Đang gửi sang Lỗi và từ Đang gửi quay về Đã ghi là hai tình huống lỗi; mũi tên từ Lỗi về Đang gửi là lần thử lại."
+  details:
+    - term: "Đã ghi, chưa gửi"
+      text: "Message nằm trong outbox, ghi cùng transaction với lần gửi của nhà cung cấp."
+    - term: "Đang gửi lên Kafka"
+      text: "Relay lấy message theo id tăng dần và gửi; chưa đánh dấu gì cho tới khi Kafka xác nhận. Đây là giai đoạn trong vòng lặp của relay, không được lưu."
+    - term: "Lỗi, chờ thử lại"
+      text: "Hết giờ hoặc broker lỗi: tăng số đếm lần thử, dừng lượt gửi, thử lại ở vòng kế. Chưa có khoảng lùi dần, chưa giới hạn số lần, chưa có hàng chờ lỗi."
+    - term: "Đã gửi, Kafka xác nhận"
+      text: "Kafka đã nhận và relay đã ghi thời điểm gửi; message không được gửi nữa."
+  pitfalls:
+    - "Cơ sở dữ liệu chỉ lưu hai trạng thái: chưa gửi và đã gửi. \"Đang gửi\" và \"Lỗi, chờ thử lại\" là giai đoạn của relay, chỉ nhận ra qua số đếm lần thử lớn hơn 0."
+    - "Bên nhận có thể thấy một message hai lần: khi relay chết sau khi gửi nhưng trước khi đánh dấu, khi ghi dấu vào cơ sở dữ liệu lỗi, hoặc khi một lần gửi hết giờ vẫn tới được broker sau đó. Bên nhận phải khử trùng theo messageId."
+    - "Một message lỗi chặn MỌI message sau nó, của mọi khách sạn và cả ba topic, cho tới khi gửi được; đây là cái giá của việc giữ thứ tự."
+    - "Mới thử với Kafka một nút chạy cục bộ; hành vi trên broker production chưa kiểm."
+  basis: "a952bed7995fef4c"
 direction: "LR"
 states:
   - id: "DaGhi"
