@@ -29,7 +29,7 @@ business:
         - "Đổi mã phòng và gói giá của nhà cung cấp sang mã nội bộ; mã lạ thì bỏ phần dữ liệu đó và ghi lỗi mã 10"
         - "Ghi lần gửi và các message vào outbox trong một transaction"
         - "Chỉ sau khi đã commit mới trả 202 kèm mã phiếu (ticketId); lưu lỗi thì trả lỗi, không báo đã nhận"
-        - "Một tiến trình nền phát các message từ outbox lên Kafka"
+        - "Một tác vụ nền (relay) trong cùng tiến trình Ingest phát các message từ outbox lên Kafka"
     - id: "gui-lai-cung-khoa"
       title: "Gửi lại cùng một lần gửi"
       steps:
@@ -39,10 +39,10 @@ business:
     - id: "phat-len-kafka"
       title: "Phát lên Kafka và khi Kafka lỗi"
       steps:
-        - "Tiến trình nền đọc outbox theo thứ tự và gửi từng message lên Kafka"
+        - "Tác vụ nền (relay) trong cùng tiến trình đọc outbox theo id tăng dần và gửi từng message lên Kafka"
         - "Chỉ khi Kafka xác nhận mới đánh dấu đã gửi"
         - "Kafka tạm ngừng hoặc dịch vụ khởi động lại: dữ liệu đã báo đã nhận vẫn nằm trong outbox và được gửi tiếp khi hệ thống phục hồi"
-        - "Lỗi ở một message thì dừng, không gửi vượt các message sau để giữ thứ tự"
+        - "Lỗi ở một message thì dừng, không gửi vượt các message sau để giữ thứ tự; message lỗi chặn mọi message sau nó, của mọi khách sạn"
         - "Có thể có message gửi lặp; bên nhận khử trùng theo messageId"
     - id: "dong-bi-bo"
       title: "Dòng hoặc gói bị bỏ, bị từ chối"
@@ -88,14 +88,14 @@ architecture:
         - "src/ingest/core/"
     - id: "hop-dong"
       title: "Hợp đồng chuẩn"
-      role: "Nơi ba lớp gặp nhau: loại message, mã lỗi, cập nhật chuẩn, cổng Publisher"
+      role: "Kiểu dữ liệu, mã lỗi, ngoại lệ và cổng Publisher dùng chung của cả ba lớp. Mọi lớp import nó; không có lời gọi nào đi qua nó"
       paths:
         - "src/ingest/contract.py"
   components:
     - id: "http"
       title: "HTTP"
       layer: "vao-ra"
-      role: "POST /v1/inventory-rates cho nhà cung cấp; /internal/v1 cho dịch vụ nội bộ; /healthz kiểm cơ sở dữ liệu"
+      role: "POST /v1/inventory-rates cho nhà cung cấp; /internal/v1 cho dịch vụ nội bộ; /healthz kiểm cơ sở dữ liệu. Chỉ gọi các hook do main.py tiêm vào, không tự chuẩn hóa"
       paths:
         - "src/ingest/io/http.py"
     - id: "kafka"
@@ -115,19 +115,19 @@ architecture:
     - id: "nhan-lo"
       title: "Nhận lần gửi"
       layer: "logic"
-      role: "Kiểm quyền khách sạn, đổi mã, chống trùng, ghi submission và outbox trong một transaction rồi mới ACK"
+      role: "Kiểm trùng, kiểm quyền khách sạn và đổi mã (đọc trước, qua cache.py và bảng ánh xạ; không gọi catalog.py hay auth.py), rồi ghi submission và outbox cùng một transaction; chỉ sau commit mới ACK"
       paths:
         - "src/ingest/core/service.py"
     - id: "relay"
       title: "Relay"
       layer: "logic"
-      role: "Đọc outbox theo thứ tự, gửi, chỉ đánh dấu khi broker xác nhận; lỗi thì dừng"
+      role: "Tác vụ nền trong cùng tiến trình (main.py khởi động): đọc outbox theo id tăng dần, gửi qua cổng Publisher, chỉ đánh dấu khi broker xác nhận; lỗi thì dừng và chặn mọi message sau"
       paths:
         - "src/ingest/core/relay.py"
     - id: "danh-muc"
       title: "Danh mục, đối tác, xác thực"
       layer: "logic"
-      role: "Bản sao danh mục để đổi mã, đối tác và quyền, băm mật khẩu scrypt, cache 24 giờ"
+      role: "catalog.py: danh mục và đối tác; auth.py: băm mật khẩu và đăng nhập; cache.py: nhớ tạm 24 giờ; schema.py: bảng. main.py gọi catalog và auth qua hook; core/service.py chỉ dùng cache.py và đọc bảng ánh xạ để đổi mã"
       paths:
         - "src/ingest/core/catalog.py"
         - "src/ingest/core/auth.py"
@@ -135,7 +135,7 @@ architecture:
         - "src/ingest/core/schema.py"
     - id: "noi-lop"
       title: "Nối ba lớp"
-      role: "Chọn publisher, tạo hook, chạy relay nền, khởi tạo bảng"
+      role: "Chọn publisher, tạo hook (xác thực, nhận lần gửi, API danh mục), khởi động relay nền trong cùng tiến trình, khởi tạo bảng"
       paths:
         - "src/ingest/main.py"
         - "src/ingest/config.py"

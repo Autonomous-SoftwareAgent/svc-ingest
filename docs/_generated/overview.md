@@ -29,7 +29,7 @@ Luồng nhan-lan-gui: Nhà cung cấp gửi tồn, điều kiện bán và giá
 6. Đổi mã phòng và gói giá của nhà cung cấp sang mã nội bộ; mã lạ thì bỏ phần dữ liệu đó và ghi lỗi mã 10
 7. Ghi lần gửi và các message vào outbox trong một transaction
 8. Chỉ sau khi đã commit mới trả 202 kèm mã phiếu (ticketId); lưu lỗi thì trả lỗi, không báo đã nhận
-9. Một tiến trình nền phát các message từ outbox lên Kafka
+9. Một tác vụ nền (relay) trong cùng tiến trình Ingest phát các message từ outbox lên Kafka
 
 Luồng gui-lai-cung-khoa: Gửi lại cùng một lần gửi
 1. Nhà cung cấp gửi lại với cùng X-Trace-Id và cùng nội dung (do mạng, hay không nhận được phản hồi)
@@ -37,10 +37,10 @@ Luồng gui-lai-cung-khoa: Gửi lại cùng một lần gửi
 3. Nếu cùng X-Trace-Id nhưng nội dung khác thì trả 409, không ghi gì
 
 Luồng phat-len-kafka: Phát lên Kafka và khi Kafka lỗi
-1. Tiến trình nền đọc outbox theo thứ tự và gửi từng message lên Kafka
+1. Tác vụ nền (relay) trong cùng tiến trình đọc outbox theo id tăng dần và gửi từng message lên Kafka
 2. Chỉ khi Kafka xác nhận mới đánh dấu đã gửi
 3. Kafka tạm ngừng hoặc dịch vụ khởi động lại: dữ liệu đã báo đã nhận vẫn nằm trong outbox và được gửi tiếp khi hệ thống phục hồi
-4. Lỗi ở một message thì dừng, không gửi vượt các message sau để giữ thứ tự
+4. Lỗi ở một message thì dừng, không gửi vượt các message sau để giữ thứ tự; message lỗi chặn mọi message sau nó, của mọi khách sạn
 5. Có thể có message gửi lặp; bên nhận khử trùng theo messageId
 
 Luồng dong-bi-bo: Dòng hoặc gói bị bỏ, bị từ chối
@@ -76,16 +76,16 @@ Lớp:
 - vao-ra (Lớp vào/ra): Giao thức: HTTP với xác thực Basic và Bearer, giới hạn kích thước, đổi mã lỗi sang HTTP; phát ra Kafka. Không chứa nghiệp vụ [src/ingest/io/]
 - chuan-hoa (Lớp chuẩn hóa): Mỗi định dạng của đối tác một module tự đăng ký; dịch gói sang cập nhật chuẩn, tách khoảng ngày theo thứ trong tuần, kiểm dữ liệu vào [src/ingest/normalize/]
 - logic (Lớp logic nội bộ): Kiểm quyền khách sạn, đổi mã, chống trùng, ghi nhật ký và outbox, relay, danh mục. Chỉ biết dạng chuẩn [src/ingest/core/]
-- hop-dong (Hợp đồng chuẩn): Nơi ba lớp gặp nhau: loại message, mã lỗi, cập nhật chuẩn, cổng Publisher [src/ingest/contract.py]
+- hop-dong (Hợp đồng chuẩn): Kiểu dữ liệu, mã lỗi, ngoại lệ và cổng Publisher dùng chung của cả ba lớp. Mọi lớp import nó; không có lời gọi nào đi qua nó [src/ingest/contract.py]
 
 Thành phần:
-- http (HTTP) @vao-ra: POST /v1/inventory-rates cho nhà cung cấp; /internal/v1 cho dịch vụ nội bộ; /healthz kiểm cơ sở dữ liệu [src/ingest/io/http.py]
+- http (HTTP) @vao-ra: POST /v1/inventory-rates cho nhà cung cấp; /internal/v1 cho dịch vụ nội bộ; /healthz kiểm cơ sở dữ liệu. Chỉ gọi các hook do main.py tiêm vào, không tự chuẩn hóa [src/ingest/io/http.py]
 - kafka (Cổng phát Kafka) @vao-ra: aiokafka, acks=all, producer idempotent, tạo lại producer sau lỗi; chỉ trả về khi broker xác nhận [src/ingest/io/kafka.py, src/ingest/io/publishers.py]
 - inventory-rates-json (Định dạng inventory-rates-json) @chuan-hoa: Đọc gói InvResRateRequest: ngày, dow, tồn, điều kiện bán, giá; dòng sai thì bỏ dòng [src/ingest/normalize/inventory_rates_json.py, src/ingest/normalize/registry.py]
-- nhan-lo (Nhận lần gửi) @logic: Kiểm quyền khách sạn, đổi mã, chống trùng, ghi submission và outbox trong một transaction rồi mới ACK [src/ingest/core/service.py]
-- relay (Relay) @logic: Đọc outbox theo thứ tự, gửi, chỉ đánh dấu khi broker xác nhận; lỗi thì dừng [src/ingest/core/relay.py]
-- danh-muc (Danh mục, đối tác, xác thực) @logic: Bản sao danh mục để đổi mã, đối tác và quyền, băm mật khẩu scrypt, cache 24 giờ [src/ingest/core/catalog.py, src/ingest/core/auth.py, src/ingest/core/cache.py, src/ingest/core/schema.py]
-- noi-lop (Nối ba lớp): Chọn publisher, tạo hook, chạy relay nền, khởi tạo bảng [src/ingest/main.py, src/ingest/config.py]
+- nhan-lo (Nhận lần gửi) @logic: Kiểm trùng, kiểm quyền khách sạn và đổi mã (đọc trước, qua cache.py và bảng ánh xạ; không gọi catalog.py hay auth.py), rồi ghi submission và outbox cùng một transaction; chỉ sau commit mới ACK [src/ingest/core/service.py]
+- relay (Relay) @logic: Tác vụ nền trong cùng tiến trình (main.py khởi động): đọc outbox theo id tăng dần, gửi qua cổng Publisher, chỉ đánh dấu khi broker xác nhận; lỗi thì dừng và chặn mọi message sau [src/ingest/core/relay.py]
+- danh-muc (Danh mục, đối tác, xác thực) @logic: catalog.py: danh mục và đối tác; auth.py: băm mật khẩu và đăng nhập; cache.py: nhớ tạm 24 giờ; schema.py: bảng. main.py gọi catalog và auth qua hook; core/service.py chỉ dùng cache.py và đọc bảng ánh xạ để đổi mã [src/ingest/core/catalog.py, src/ingest/core/auth.py, src/ingest/core/cache.py, src/ingest/core/schema.py]
+- noi-lop (Nối ba lớp): Chọn publisher, tạo hook (xác thực, nhận lần gửi, API danh mục), khởi động relay nền trong cùng tiến trình, khởi tạo bảng [src/ingest/main.py, src/ingest/config.py]
 - mo-phong (Nhà cung cấp mô phỏng): Script gửi gói mẫu để chạy thử; không phải nhà cung cấp thật [tools/sim/supplier.py]
 
 Phụ thuộc vào:

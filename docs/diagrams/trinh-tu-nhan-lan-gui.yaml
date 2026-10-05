@@ -7,11 +7,11 @@ sources:
   - "src/ingest/core/service.py"
   - "src/ingest/core/relay.py"
 explain:
-  meaning: "Sơ đồ cho thấy ai gọi ai từ lúc nhà cung cấp gửi một gói tới lúc message tới bên nhận. Điểm cốt lõi: Ingest chỉ báo đã nhận (202) sau khi dữ liệu đã nằm bền trong cơ sở dữ liệu, còn việc phát lên Kafka diễn ra sau đó ở tác vụ nền."
+  meaning: "Sơ đồ cho thấy ai gọi ai từ lúc nhà cung cấp gửi một gói tới lúc message được phát lên Kafka. Điểm cốt lõi: Ingest chỉ báo đã nhận (202) sau khi dữ liệu đã nằm bền trong cơ sở dữ liệu, còn việc phát lên Kafka diễn ra sau đó ở tác vụ nền. Chưa có bên nhận thật."
   read:
     - "Thời gian chạy từ trên xuống; mỗi cột là một bên. Số trên mũi tên là thứ tự bước."
     - "Mũi tên liền là lời gọi, mũi tên đứt là câu trả lời."
-    - "Khối alt là chỗ rẽ: lần gửi lặp lại cùng nội dung, hoặc lần gửi mới; chỉ đi một nhánh."
+    - "Khối rẽ nhánh có ba nhánh, chỉ đi một: gửi lặp cùng nội dung, gửi lại cùng X-Trace-Id nhưng khác nội dung, hoặc lần gửi mới."
     - "Từ bước relay đọc cơ sở dữ liệu trở đi là phần chạy nền, không nằm trong lời gọi của nhà cung cấp."
   details:
     - term: "Nhà cung cấp"
@@ -25,15 +25,13 @@ explain:
     - term: "Relay"
       text: "Tác vụ nền trong cùng tiến trình: đọc outbox theo id tăng dần, gửi lên Kafka, và chỉ đánh dấu đã gửi khi Kafka xác nhận."
     - term: "Kafka"
-      text: "Nhận message với acks=all và xác nhận lại cho relay."
-    - term: "Bên nhận (chưa có)"
-      text: "Sẽ nhận message tồn, điều kiện bán và giá; mỗi message có messageId để khử trùng. Hiện chưa có dịch vụ nào nhận."
+      text: "Nhận message với acks=all và xác nhận lại cho relay. Message có messageId để bên nhận khử trùng; hiện chưa có dịch vụ nào đọc ba topic này."
   pitfalls:
     - "202 nghĩa là đã nhận và lưu an toàn, chưa phải là tồn và giá đã được cập nhật ở bên nhận."
     - "Gửi lại cùng X-Trace-Id và cùng nội dung trả đúng mã phiếu cũ, không ghi thêm message. Cùng X-Trace-Id nhưng nội dung khác thì bị từ chối 409 (mã 40), không ghi gì. Khóa chống trùng tính theo từng đối tác."
     - "Dạng gói JSON, xác thực Basic, việc ai thêm X-Trace-Id và khóa chống trùng đều theo mô tả của người dùng, chưa kiểm với nhà cung cấp thật."
     - "Kafka mới thử với broker một nút chạy cục bộ; acks=all trên cụm nhiều nút chưa kiểm."
-  basis: "beff17e7f0ff9a45"
+  basis: "c2654d5f15a4b4e2"
 autonumber: true
 participants:
   - id: "ncc"
@@ -53,9 +51,6 @@ participants:
     actor: false
   - id: "kafka"
     label: "Kafka"
-    actor: false
-  - id: "nhan"
-    label: "Bên nhận (chưa có)"
     actor: false
 steps:
   - message:
@@ -77,23 +72,45 @@ steps:
                 to: "http"
                 text: "Trả lại đúng TicketId cũ, không ghi thêm gì"
                 reply: true
+            - message:
+                from: "http"
+                to: "ncc"
+                text: "202 kèm TicketId cũ, đánh dấu là gửi lặp"
+                reply: true
+        - when: "Cùng X-Trace-Id nhưng nội dung khác"
+          steps:
+            - message:
+                from: "loi"
+                to: "http"
+                text: "Từ chối, mã lỗi 40, không ghi gì"
+                reply: true
+            - message:
+                from: "http"
+                to: "ncc"
+                text: "409, không ghi gì"
+                reply: true
       otherwise:
         steps:
           - message:
               from: "loi"
               to: "db"
-              text: "Kiểm quyền khách sạn, đổi mã phòng và gói giá, ghi lần gửi và outbox trong một transaction"
+              text: "Kiểm quyền khách sạn, đổi mã phòng và gói giá; ghi lần gửi và outbox cùng một transaction"
               reply: false
           - message:
               from: "db"
               to: "loi"
               text: "Đã commit"
               reply: true
-  - message:
-      from: "http"
-      to: "ncc"
-      text: "202 kèm TicketId: đã nhận và lưu an toàn, chưa phải đã cập nhật xong"
-      reply: true
+          - message:
+              from: "loi"
+              to: "http"
+              text: "TicketId mới"
+              reply: true
+          - message:
+              from: "http"
+              to: "ncc"
+              text: "202 kèm TicketId: đã nhận và lưu an toàn, chưa phải đã cập nhật xong"
+              reply: true
   - note:
       over:
         - "http"
@@ -102,7 +119,7 @@ steps:
   - message:
       from: "relay"
       to: "db"
-      text: "Đọc các message chưa gửi theo thứ tự"
+      text: "Đọc các message chưa gửi theo id tăng dần"
       reply: false
   - message:
       from: "relay"
@@ -119,13 +136,8 @@ steps:
       to: "db"
       text: "Đánh dấu đã gửi"
       reply: false
-  - message:
-      from: "kafka"
-      to: "nhan"
-      text: "Message tồn, điều kiện bán, giá (có messageId để khử trùng)"
-      reply: false
   - note:
       over:
         - "relay"
         - "kafka"
-      text: "Kafka lỗi: không đánh dấu, thử lại sau; dữ liệu đã ACK không mất"
+      text: "Kafka lỗi: không đánh dấu, thử lại sau; dữ liệu đã ACK không mất. Bên nhận (chưa có) đọc message từ topic"
