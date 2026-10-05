@@ -47,7 +47,7 @@ Chỉ thêm bản ghi mới; không sửa bản ghi cũ (đánh dấu `supersede
 
 ## D-008: Định dạng đối tác là module tự đăng ký (mô-đun mở)
 - Ngày: 2026-10-05
-- Trạng thái: accepted (người dùng: thiết kế mô-đun mở, không buộc vào một bên cụ thể; cách hiểu cụ thể là của tôi).
+- Trạng thái: accepted (người dùng chốt hướng mô-đun mở, không buộc vào một bên cụ thể, còn cách hiểu cụ thể là của tôi)
 - Quyết định: `normalize/registry.py` đăng ký hàm `(bytes, Limits) -> NormalizedSubmission` theo tên; đối tác chọn định dạng khi đăng ký. Nhận bytes để một định dạng có thể không phải JSON.
 
 ## D-009: Quy ước đọc gói `inventory-rates-json`
