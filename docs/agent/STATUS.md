@@ -27,3 +27,4 @@ Cập nhật lần cuối: 2026-10-05
 |---|---|
 | 2026-10-05 | Tạo khung dịch vụ bằng .claude/plugin/tools/new-service.js (dựng lại sau khi gỡ hẳn bản cũ; bản cũ sao lưu ở `BSN_/.backup/ingest-cu-2026-10-05/`) |
 | 2026-10-05 | Viết mã, test (107 qua với PostgreSQL và Kafka cục bộ), Dockerfile, compose, nhà cung cấp mô phỏng; ghi docs, sơ đồ, vấn đề. Điều chưa kiểm: xem mục "Chưa kiểm với hệ thống thật" |
+| 2026-10-05 | Xử lý handoff `root-to-ingest-duong-dan-trong-tai-lieu`: sửa đường dẫn tương đối sai trong `CLAUDE.md` (dòng 6, 7) và trong D-001 của `DECISIONS.md` (hai đường dẫn ở dòng Bối cảnh và Quyết định, sửa tại chỗ, nội dung quyết định không đổi). Kiểm bằng grep và `docs check`; không đụng mã |

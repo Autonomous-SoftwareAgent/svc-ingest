@@ -3,8 +3,8 @@
 Quy tắc chung cho mọi dịch vụ và cách làm việc (một harness duy nhất ở `BSN_/.claude`) nằm ở `../../CLAUDE.md` (tự nạp). **Mở phiên Claude Code ở `BSN_/`** rồi giao việc cho dịch vụ này; hook, MCP `bsn-docs` và skill chỉ nạp ở gốc, mở thẳng trong thư mục dịch vụ thì không có hook nào. Tệp này là phần riêng của dịch vụ.
 
 ## Phạm vi
-- Làm trong `ingest/`. Ngoài thư mục này chỉ đọc; việc cần dịch vụ khác thì ghi yêu cầu vào `../docs/handoff/`.
-- Đầu phiên: đọc [docs/agent/STATUS.md](docs/agent/STATUS.md), [docs/agent/DECISIONS.md](docs/agent/DECISIONS.md), [docs/agent/CONVENTIONS.md](docs/agent/CONVENTIONS.md). Liệt kê các tệp `../docs/handoff/*-to-ingest-*.md` còn `open` và báo người dùng.
+- Làm trong `system_service/ingest/`. Ngoài thư mục này chỉ đọc; việc cần dịch vụ khác thì ghi yêu cầu vào `../../docs/handoff/`.
+- Đầu phiên: đọc [docs/agent/STATUS.md](docs/agent/STATUS.md), [docs/agent/DECISIONS.md](docs/agent/DECISIONS.md), [docs/agent/CONVENTIONS.md](docs/agent/CONVENTIONS.md). Liệt kê các tệp `../../docs/handoff/*-to-ingest-*.md` còn `open` và báo người dùng.
 - Tài liệu ba tầng (design/spec/impl) chỉ ghi qua công cụ MCP `bsn-docs` với `service="ingest"` (`design_record` tạo `docs/modules` lần đầu); không sửa tay. Dịch vụ này CHƯA dùng ba tầng.
 - Trong `docs/` của dịch vụ chỉ có Markdown cho agent, không đặt HTML. Nguồn có cấu trúc của dịch vụ là `docs/service.yaml` (nghiệp vụ, kiến trúc, vấn đề và tiến độ), ghi bằng `bsn-docs`: `service_doc_set`, `problem_record`. Sơ đồ khai bằng `diagram_save`, không tự viết Mermaid. Người đọc xem cổng cục bộ `BSN_/docs/portal/ingest/index.html`, sinh tự động từ nguồn đó sau mỗi commit.
 

@@ -5,8 +5,8 @@ Chỉ thêm bản ghi mới; không sửa bản ghi cũ (đánh dấu `supersede
 ## D-001: Ingest là dịch vụ riêng, Python, tách hẳn các "ingest" khác
 - Ngày: 2026-10-05
 - Trạng thái: accepted (người dùng chốt).
-- Bối cảnh: sơ đồ tham chiếu (`../../docs/tham-chieu/02-engineering-view.md`) có thành phần Ingestion nhận tồn và giá nhà cung cấp. Trên máy còn hai hệ khác cũng có "ingest" (DA08 `rag-worker`, `D:\Training\ingest_service`) nhưng nạp tài liệu vào Qdrant cho RAG, khác hẳn.
-- Quyết định: một repo riêng `system_service/ingest`, Python, ba lớp theo `../../CLAUDE.md`, không dùng chung mã hay tiến trình với các hệ kia (chỉ dùng chung cách làm). Hệ thống tham chiếu mà người dùng mô tả được coi là tham khảo bên ngoài, không đối chiếu với mã của nó.
+- Bối cảnh: sơ đồ tham chiếu (`BSN_/docs/tham-chieu/02-engineering-view.md`) có thành phần Ingestion nhận tồn và giá nhà cung cấp. Trên máy còn hai hệ khác cũng có "ingest" (DA08 `rag-worker`, `D:\Training\ingest_service`) nhưng nạp tài liệu vào Qdrant cho RAG, khác hẳn.
+- Quyết định: một repo riêng `system_service/ingest`, Python, ba lớp theo `BSN_/CLAUDE.md`, không dùng chung mã hay tiến trình với các hệ kia (chỉ dùng chung cách làm). Hệ thống tham chiếu mà người dùng mô tả được coi là tham khảo bên ngoài, không đối chiếu với mã của nó.
 - Hệ quả: bản làm trước đó (viết khi chưa được duyệt, theo giả định tồn/giá chung chung) bị gỡ hẳn; bản sao lưu ở `BSN_/.backup/ingest-cu-2026-10-05/`.
 
 ## D-002: Phát lên Kafka bằng cổng Publisher; broker production chưa chọn
