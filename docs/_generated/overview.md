@@ -1,0 +1,170 @@
+<!-- GENERATED từ docs/service.yaml bằng bsn-docs. Không sửa tay; ghi nguồn bằng service_doc_set / problem_record. -->
+# Ingest (cửa nhận tồn và giá khách sạn) (ingest)
+
+Cửa nhận tồn phòng, điều kiện bán và giá khách sạn do nhà cung cấp đẩy vào. Kiểm người gửi và quyền theo khách sạn, đổi mã phòng và gói giá sang mã nội bộ, chống trùng, lưu bền rồi mới báo đã nhận, sau đó phát lên Kafka. Không giữ số phòng hay giá hiện tại và không tính giá.
+
+Cập nhật: 2026-10-05. Bản cho người đọc: BSN_/docs/portal/ingest/index.html (sinh từ cùng nguồn).
+
+## Nghiệp vụ
+
+Mục tiêu: Để số phòng còn bán, điều kiện bán và giá mà khách thấy khi tìm và đặt khớp với hệ thống của nhà cung cấp: chuẩn hóa mã, kiểm quyền theo khách sạn, rồi mới đẩy đi.
+
+Người dùng và nhu cầu:
+- Hệ thống của nhà cung cấp khách sạn: Tự động gửi cập nhật số phòng, điều kiện bán và giá (chỉ phần thay đổi) và biết ngay là đã được nhận
+- Dịch vụ nội bộ và người vận hành: Đăng ký đối tác, cấp quyền khách sạn, nạp danh mục phòng và gói giá, tra cứu danh mục
+- Dịch vụ nhận cập nhật (tồn, giá): Nhận đủ message, đúng thứ tự trong cùng phòng và gói giá, có mã định danh để khử trùng
+
+Giá trị mang lại:
+- Khách không thấy còn phòng khi đã hết, hay thấy giá cũ, vì mọi cập nhật nhà cung cấp gửi đều được ghi nhận bền trước khi báo đã nhận
+- Gửi lại hay mạng chập chờn không làm cập nhật bị trùng: cùng khóa và cùng nội dung thì nhận lại đúng một mã phiếu
+- Một dòng sai không làm hỏng cả lần gửi: mã phòng hoặc gói giá lạ thì bỏ dòng đó và báo lỗi, phần hợp lệ vẫn đi
+- Thêm một cách kết nối hoặc một định dạng của đối tác mới là thêm một tệp, không sửa phần đang chạy
+
+Luồng nhan-lan-gui: Nhà cung cấp gửi tồn, điều kiện bán và giá
+1. Nhà cung cấp gửi gói JSON kèm tên đăng nhập, mật khẩu, mã theo dõi X-Trace-Id (UUID) và kênh gửi X-Channel-Id
+2. Ingest kiểm tên đăng nhập và mật khẩu; sai thì trả 401
+3. Ingest kiểm X-Trace-Id đúng UUID và nội dung không quá lớn
+4. Chuẩn hóa gói: tách khoảng ngày theo thứ trong tuần, tách mỗi dòng thành tối đa ba loại cập nhật (tồn, điều kiện bán, giá), bỏ qua trường không gửi
+5. Kiểm đối tác có quyền với khách sạn này; không có hoặc mã lạ thì trả 401 và không nhận gì
+6. Đổi mã phòng và gói giá của nhà cung cấp sang mã nội bộ; mã lạ thì bỏ phần dữ liệu đó và ghi lỗi mã 10
+7. Ghi lần gửi và các message vào outbox trong một transaction
+8. Chỉ sau khi đã commit mới trả 202 kèm mã phiếu (ticketId); lưu lỗi thì trả lỗi, không báo đã nhận
+9. Một tiến trình nền phát các message từ outbox lên Kafka
+
+Luồng gui-lai-cung-khoa: Gửi lại cùng một lần gửi
+1. Nhà cung cấp gửi lại với cùng X-Trace-Id và cùng nội dung (do mạng, hay không nhận được phản hồi)
+2. Ingest trả đúng mã phiếu cũ và đánh dấu duplicate, không ghi thêm message nào
+3. Nếu cùng X-Trace-Id nhưng nội dung khác thì trả 409, không ghi gì
+
+Luồng phat-len-kafka: Phát lên Kafka và khi Kafka lỗi
+1. Tiến trình nền đọc outbox theo thứ tự và gửi từng message lên Kafka
+2. Chỉ khi Kafka xác nhận mới đánh dấu đã gửi
+3. Kafka tạm ngừng hoặc dịch vụ khởi động lại: dữ liệu đã báo đã nhận vẫn nằm trong outbox và được gửi tiếp khi hệ thống phục hồi
+4. Lỗi ở một message thì dừng, không gửi vượt các message sau để giữ thứ tự
+5. Có thể có message gửi lặp; bên nhận khử trùng theo messageId
+
+Luồng dong-bi-bo: Dòng hoặc gói bị bỏ, bị từ chối
+1. Dòng sai cấu trúc (ngày sai, số âm, giá lặp số khách...): bỏ dòng, báo lỗi mã 20, các dòng khác vẫn đi
+2. Mã phòng lạ: bỏ mọi cập nhật của phòng đó, báo mã 10. Mã gói giá lạ: bỏ điều kiện bán và giá nhưng giữ tồn, báo mã 10
+3. Không còn dữ liệu hợp lệ nào: từ chối cả lần gửi (mã 12), không lưu gì nên cùng X-Trace-Id gửi lại được bản đã sửa
+4. Gói không đọc được: trả 400. Quá lớn: trả 413
+
+Ngoài phạm vi:
+- Giữ số phòng còn lại hay giá hiện tại làm dữ liệu chính thức (dịch vụ nhận message giữ)
+- Tính giá, quản lý sản phẩm và nội dung
+- Đối tác kéo danh sách đặt chỗ từ VTrip
+- Trả kết quả xử lý cuối cho nhà cung cấp hay API tra cứu trạng thái: ACK chỉ có nghĩa đã nhận và đã lưu an toàn
+- Chạy lại phân tích (replay), kết nối JetStream, webhook ra, Kafka vào (chưa làm)
+
+CHƯA kiểm với hệ thống thật:
+- Chưa kiểm với nhà cung cấp thật: dạng gói, quy ước thứ trong tuần, cờ đóng, và nhà cung cấp thật có gửi được Basic và X-Trace-Id không
+- Chưa rõ ai thêm header X-Trace-Id (nhà cung cấp hay cổng trung gian)
+- Khóa chống trùng là (đối tác, X-Trace-Id) kèm mã băm nội dung: là giả định, chưa xác nhận
+- Khoảng ngày from và to được hiểu là tính cả hai đầu: giả định, chưa xác nhận
+- Dữ liệu không có tiền tệ nên không biết các số tiền là đồng nào
+- Gói không có giờ của nhà cung cấp nên không phát hiện được gửi trễ hay đảo thứ tự giữa hai lần gửi
+- Chỉ kiểm Kafka với broker một nút chạy cục bộ, chưa kiểm broker production
+- Danh mục khách sạn, phòng, gói giá nạp qua API nội bộ vì chưa biết nguồn thật
+- Mục tiêu độ trễ (dưới 10 giây kênh sở hữu, dưới 60 giây kênh đối tác, p99) là của cả đường đi và chưa được đo
+- Chưa có dịch vụ nhận message (Inventory, worker tồn); chỉ có worker tham chiếu trong test
+
+## Kiến trúc kỹ thuật
+
+Ba lớp, phụ thuộc một chiều, gặp nhau qua hợp đồng chuẩn (contract.py). Lớp vào/ra nhận HTTP và phát Kafka; lớp chuẩn hóa dịch gói của từng đối tác thành cập nhật chuẩn; lớp lõi kiểm quyền, đổi mã, chống trùng, ghi nhật ký và outbox. Chỉ main.py nối các lớp. PostgreSQL là cơ sở dữ liệu duy nhất; Kafka là nơi phát.
+
+Lớp:
+- vao-ra (Lớp vào/ra): Giao thức: HTTP với xác thực Basic và Bearer, giới hạn kích thước, đổi mã lỗi sang HTTP; phát ra Kafka. Không chứa nghiệp vụ [src/ingest/io/]
+- chuan-hoa (Lớp chuẩn hóa): Mỗi định dạng của đối tác một module tự đăng ký; dịch gói sang cập nhật chuẩn, tách khoảng ngày theo thứ trong tuần, kiểm dữ liệu vào [src/ingest/normalize/]
+- logic (Lớp logic nội bộ): Kiểm quyền khách sạn, đổi mã, chống trùng, ghi nhật ký và outbox, relay, danh mục. Chỉ biết dạng chuẩn [src/ingest/core/]
+- hop-dong (Hợp đồng chuẩn): Nơi ba lớp gặp nhau: loại message, mã lỗi, cập nhật chuẩn, cổng Publisher [src/ingest/contract.py]
+
+Thành phần:
+- http (HTTP) @vao-ra: POST /v1/inventory-rates cho nhà cung cấp; /internal/v1 cho dịch vụ nội bộ; /healthz kiểm cơ sở dữ liệu [src/ingest/io/http.py]
+- kafka (Cổng phát Kafka) @vao-ra: aiokafka, acks=all, producer idempotent, tạo lại producer sau lỗi; chỉ trả về khi broker xác nhận [src/ingest/io/kafka.py, src/ingest/io/publishers.py]
+- inventory-rates-json (Định dạng inventory-rates-json) @chuan-hoa: Đọc gói InvResRateRequest: ngày, dow, tồn, điều kiện bán, giá; dòng sai thì bỏ dòng [src/ingest/normalize/inventory_rates_json.py, src/ingest/normalize/registry.py]
+- nhan-lo (Nhận lần gửi) @logic: Kiểm quyền khách sạn, đổi mã, chống trùng, ghi submission và outbox trong một transaction rồi mới ACK [src/ingest/core/service.py]
+- relay (Relay) @logic: Đọc outbox theo thứ tự, gửi, chỉ đánh dấu khi broker xác nhận; lỗi thì dừng [src/ingest/core/relay.py]
+- danh-muc (Danh mục, đối tác, xác thực) @logic: Bản sao danh mục để đổi mã, đối tác và quyền, băm mật khẩu scrypt, cache 24 giờ [src/ingest/core/catalog.py, src/ingest/core/auth.py, src/ingest/core/cache.py, src/ingest/core/schema.py]
+- noi-lop (Nối ba lớp): Chọn publisher, tạo hook, chạy relay nền, khởi tạo bảng [src/ingest/main.py, src/ingest/config.py]
+- mo-phong (Nhà cung cấp mô phỏng): Script gửi gói mẫu để chạy thử; không phải nhà cung cấp thật [tools/sim/supplier.py]
+
+Phụ thuộc vào:
+- PostgreSQL (infra, qua SQLAlchemy Core, psycopg): Đối tác, danh mục, nhật ký lần gửi, outbox
+- Kafka (infra, qua aiokafka): Phát ba loại message tồn, điều kiện bán, giá
+- Hệ thống của nhà cung cấp (external, qua HTTP, xác thực Basic): Nguồn tồn, điều kiện bán và giá (chưa kiểm với nhà cung cấp thật)
+
+Cung cấp cho:
+- Nhà cung cấp (qua POST /v1/inventory-rates): Nhận cập nhật tồn, điều kiện bán và giá, trả ACK kèm mã phiếu
+- Dịch vụ nội bộ và người vận hành (qua /internal/v1/partners...): Đăng ký đối tác, cấp quyền khách sạn, nạp và tra cứu danh mục
+- Dịch vụ nhận cập nhật (Inventory, worker tồn; chưa có) (qua Kafka: ingest.ari.inventory, ingest.ari.restrictions, ingest.ari.rates): Cập nhật tồn, điều kiện bán và giá, có messageId để khử trùng
+
+Quyết định liên quan:
+- D-001: Ingest riêng, Python, tách hẳn các ingest khác
+- D-002: Phát lên Kafka qua cổng Publisher; broker production chưa chọn
+- D-003: ACK sau commit, outbox, phát ít nhất một lần
+- D-004: Khóa chống trùng là (đối tác, X-Trace-Id) kèm mã băm
+- D-005: Không giữ tồn hay giá hiện tại; thứ tự theo giờ nhận
+- D-006: Khách sạn lạ và không có quyền cùng 401 mã 31
+- D-007: Danh mục là bản sao, nạp qua API nội bộ, cache 24 giờ
+- D-008: Định dạng đối tác là module tự đăng ký
+- D-009: Quy ước đọc gói inventory-rates-json
+
+## Vấn đề và tinh chỉnh
+
+Đã xong:
+- Khung dịch vụ theo skill new-service, ba lớp và test quét import
+- Chuẩn hóa gói inventory-rates-json và lõi nhận lần gửi (kiểm quyền, đổi mã, chống trùng, outbox, ACK sau commit)
+- HTTP cho nhà cung cấp và API nội bộ; relay; phát Kafka thật bằng aiokafka
+- 107 test qua trên PostgreSQL và Kafka cục bộ, gồm ba kịch bản RQM: Kafka tạm dừng, khởi động lại, message lặp
+- Chạy thật bằng uvicorn và bằng docker compose (Ingest, PostgreSQL, Kafka) với nhà cung cấp mô phỏng
+- Tài liệu: service.yaml, sổ vấn đề, bốn sơ đồ, quyết định D-001 đến D-009
+
+Tiếp theo:
+- Chốt broker production và dựng topic (số phân vùng, retention)
+- Xác nhận với nhà cung cấp thật: khóa chống trùng, from/to tính cả hai đầu, tiền tệ, ai thêm X-Trace-Id
+- Chỉnh skill cicd cho ingest và thử đường deploy Docker Hub, VM GCP
+- Công cụ migration, chọn leader cho relay, chỉ số và cảnh báo (độ trễ, số outbox chưa gửi)
+- Thêm kết nối còn thiếu: JetStream, webhook ra, Kafka vào; API replay nếu cần
+- Dịch vụ nhận message (Inventory, worker tồn) và hợp đồng message thật với họ
+
+Vấn đề chưa xong (10):
+- P-001 [open, medium] Không phát hiện gửi trễ hay đảo thứ tự giữa hai lần gửi (phát hiện 2026-10-05)
+  Vấn đề: Gói của nhà cung cấp không có giờ riêng, nên Ingest chỉ gắn giờ nó nhận (receivedAt) và giữ thứ tự trong cùng khóa phân vùng. Hai lần gửi tới đảo thứ tự (lần cũ tới sau lần mới) vẫn được nhận như bình thường và có thể ghi đè số phòng hoặc giá mới bằng dữ liệu cũ ở bên nhận. Lệch với yêu cầu thứ tự theo timestamp ở tài liệu tham chiếu nếu bên nhận cần giờ của nhà cung cấp.
+  Tinh chỉnh: Chưa tinh chỉnh. Hướng: xin nhà cung cấp gửi giờ cập nhật trong gói, hoặc Ingest giữ mốc mới nhất theo từng phòng và gói giá (đổi quyết định D-005).
+  Tham chiếu: D-005, src/ingest/core/service.py
+- P-002 [open, medium] Không có kênh báo lỗi hay cảnh báo cho người vận hành (phát hiện 2026-10-05)
+  Vấn đề: Các dòng bị bỏ (mã 10, 20) chỉ được trả lại cho nhà cung cấp và lưu trong cột row_errors của bảng submission. Không ai được báo khi nhà cung cấp liên tục gửi mã lạ, khi outbox đọng lại, hay khi Kafka lỗi; chỉ có log và /healthz (số outbox chưa gửi). Tài liệu tham chiếu nói cảnh báo không có người nhận thì bằng không có cảnh báo.
+  Tinh chỉnh: Chưa tinh chỉnh. Cần chỉ số (độ trễ gửi, số outbox chưa gửi, số dòng bị bỏ theo đối tác) và người nhận cảnh báo.
+  Tham chiếu: src/ingest/core/service.py, src/ingest/main.py
+- P-003 [open, medium] Relay chỉ chạy một bản và một message lỗi chặn mọi message sau (phát hiện 2026-10-05)
+  Vấn đề: Relay dừng ở message lỗi đầu tiên để không đảo thứ tự, nên một message không gửi được (ví dụ quá lớn, topic bị từ chối) chặn toàn bộ outbox: số phòng và giá mới của mọi khách sạn dồn lại, khách thấy dữ liệu cũ. Chưa có chọn leader, nên chạy nhiều bản Ingest cùng bật relay có thể gửi trùng hoặc lệch thứ tự (cần đặt INGEST_RELAY_ENABLED=false ở các bản còn lại).
+  Tinh chỉnh: Chưa tinh chỉnh. Hướng: chặn theo từng khóa phân vùng thay vì toàn bộ, chuyển message hỏng sang hàng đợi lỗi sau số lần thử, chọn leader bằng khóa của PostgreSQL.
+  Tham chiếu: D-003, src/ingest/core/relay.py
+- P-004 [open, medium] Có thể phát lặp message, bên nhận phải khử trùng (phát hiện 2026-10-05)
+  Vấn đề: Giao nhận ít nhất một lần. Đã đo với Kafka cục bộ: khi Kafka bị tạm dừng, lần gửi hết giờ vẫn có thể tới broker, rồi relay gửi lại nên cùng một messageId xuất hiện hai lần. Bên nhận không khử trùng theo messageId thì số phòng hoặc giá bị áp dụng hai lần. Hiện chưa có bên nhận thật; chỉ có worker tham chiếu trong test.
+  Tinh chỉnh: Test tests/test_kafka_rqm.py kiểm worker tham chiếu khử trùng bằng khóa chính messageId trong cùng giao dịch cập nhật. Cần yêu cầu bên nhận thật làm như vậy.
+  Tham chiếu: D-003, tests/test_kafka_rqm.py
+- P-005 [open, low] Sai quyền theo khách sạn trả 401, khách sạn lạ không phân biệt được (phát hiện 2026-10-05)
+  Vấn đề: Theo mô tả của người dùng, đối tác không được gửi cho khách sạn này thì trả 401 (thường là 403). Danh mục chỉ có khách sạn mà đối tác được phép, nên mã khách sạn lạ và không có quyền cùng trả 401 mã 31. Nhà cung cấp phân biệt "sai mật khẩu" và "sai khách sạn" chỉ qua mã lỗi 30 và 31 trong thân phản hồi.
+  Tinh chỉnh: Giữ như mô tả. Cân nhắc đổi thành 403 nếu nhà cung cấp chấp nhận.
+  Tham chiếu: D-006, src/ingest/io/http.py
+- P-006 [open, medium] Danh mục chưa có nguồn thật; cache 24 giờ theo từng tiến trình (phát hiện 2026-10-05)
+  Vấn đề: Khách sạn, phòng, gói giá và quyền đối tác hiện nạp bằng tay qua API nội bộ vì chưa dịch vụ nào cấp. Tra cứu được nhớ 24 giờ trong từng tiến trình: sửa danh mục ở tiến trình khác thì tiến trình này vẫn đổi mã theo bản cũ tới khi hết hạn (đã có test). Thu hồi quyền một khách sạn của đối tác có thể chậm hiệu lực tới 24 giờ khi chạy nhiều bản.
+  Tinh chỉnh: Chưa tinh chỉnh. Hướng: nguồn danh mục thật (Master data), cache có thể xóa chủ động hoặc ngắn hơn cho phần quyền.
+  Tham chiếu: D-007, src/ingest/core/catalog.py, src/ingest/core/cache.py
+- P-007 [open, high] Chưa kiểm với nhà cung cấp thật và Kafka production (phát hiện 2026-10-05)
+  Vấn đề: Mọi test chạy với nhà cung cấp mô phỏng viết theo mô tả của người dùng và Kafka một nút cục bộ. Chưa biết nhà cung cấp thật có gửi được Basic và X-Trace-Id, có dùng cùng khóa chống trùng, có hiểu from và to tính cả hai đầu, và quy ước dow có đúng không. Sai một điểm thì có thể từ chối nhầm lô hợp lệ hoặc ghi sai ngày bán, ảnh hưởng tới số phòng và giá khách thấy.
+  Tinh chỉnh: Chưa tinh chỉnh. Cần thử với một nhà cung cấp thật hoặc môi trường kiểm của họ, và dựng Kafka production rồi chạy lại ba kịch bản RQM.
+  Tham chiếu: D-002, D-004, D-009, tests/test_kafka_rqm.py
+- P-008 [open, medium] Giá không có tiền tệ (phát hiện 2026-10-05)
+  Vấn đề: Gói của nhà cung cấp chỉ có số tiền, không có đơn vị tiền tệ hay thuế riêng (giá được coi là đã gồm thuế). Ingest không gán tiền tệ, nên bên nhận không thể biết các số là đồng nào. Gán sai (ví dụ cứ coi là VND) sẽ hiển thị sai giá cho khách.
+  Tinh chỉnh: Chưa tinh chỉnh. Cần quyết định nghiệp vụ: tiền tệ theo khách sạn hay theo đối tác, đặt ở danh mục hoặc hợp đồng với nhà cung cấp.
+  Tham chiếu: D-009, src/ingest/normalize/inventory_rates_json.py
+- P-009 [open, medium] Chưa có bên nhận message và hợp đồng message thật (phát hiện 2026-10-05)
+  Vấn đề: Dạng message phát ra (tên trường, mã nội bộ, khoảng ngày tính cả hai đầu, tên topic, khóa phân vùng) do Ingest tự định nghĩa vì Inventory và worker tồn chưa tồn tại. Tài liệu tham chiếu yêu cầu mỗi topic có chủ, có bên phát và bên nhận; hiện topic chưa có bên nhận nên chưa chắc đã đúng nhu cầu của họ.
+  Tinh chỉnh: Chưa tinh chỉnh. Khi dựng dịch vụ nhận, chốt hợp đồng message cùng họ qua docs/handoff.
+  Tham chiếu: D-002, src/ingest/core/service.py
+- P-010 [open, low] Chưa có migration, chỉ số và đo tải; chưa chỉnh skill cicd (phát hiện 2026-10-05)
+  Vấn đề: Bảng tạo bằng create_all lúc khởi động nên đổi schema sau này không có đường nâng cấp. Mục tiêu độ trễ (dưới 10 giây kênh sở hữu, dưới 60 giây kênh đối tác, p99) chưa đo và chưa có chỉ số. Skill cicd viết cho payment-hub, chưa chỉnh và chưa thử deploy Docker Hub, VM GCP cho ingest.
+  Tinh chỉnh: Chưa tinh chỉnh.
+  Tham chiếu: docker-compose.yml, src/ingest/core/schema.py

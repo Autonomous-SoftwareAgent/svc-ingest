@@ -1,0 +1,103 @@
+id: "trinh-tu-nhan-lan-gui"
+type: "sequence"
+title: "Trình tự một lần gửi tồn, điều kiện bán và giá"
+tab: "business"
+sources:
+  - "src/ingest/io/http.py"
+  - "src/ingest/core/service.py"
+  - "src/ingest/core/relay.py"
+autonumber: true
+participants:
+  - id: "ncc"
+    label: "Nhà cung cấp"
+    actor: true
+  - id: "http"
+    label: "Ingest (HTTP)"
+    actor: false
+  - id: "loi"
+    label: "Ingest (lõi)"
+    actor: false
+  - id: "db"
+    label: "PostgreSQL"
+    actor: false
+  - id: "relay"
+    label: "Relay"
+    actor: false
+  - id: "kafka"
+    label: "Kafka"
+    actor: false
+  - id: "nhan"
+    label: "Bên nhận (chưa có)"
+    actor: false
+steps:
+  - message:
+      from: "ncc"
+      to: "http"
+      text: "Gửi gói JSON kèm Basic, X-Trace-Id, X-Channel-Id"
+      reply: false
+  - message:
+      from: "http"
+      to: "loi"
+      text: "Kiểm đăng nhập và X-Trace-Id, chuẩn hóa gói (tách khoảng ngày theo thứ trong tuần)"
+      reply: false
+  - alt:
+      branches:
+        - when: "Cùng X-Trace-Id và cùng nội dung đã nhận trước đó"
+          steps:
+            - message:
+                from: "loi"
+                to: "http"
+                text: "Trả lại đúng TicketId cũ, không ghi thêm gì"
+                reply: true
+      otherwise:
+        steps:
+          - message:
+              from: "loi"
+              to: "db"
+              text: "Kiểm quyền khách sạn, đổi mã phòng và gói giá, ghi lần gửi và outbox trong một transaction"
+              reply: false
+          - message:
+              from: "db"
+              to: "loi"
+              text: "Đã commit"
+              reply: true
+  - message:
+      from: "http"
+      to: "ncc"
+      text: "202 kèm TicketId: đã nhận và lưu an toàn, chưa phải đã cập nhật xong"
+      reply: true
+  - note:
+      over:
+        - "http"
+        - "db"
+      text: "Chỉ trả 202 sau khi commit. Lưu lỗi thì trả lỗi, không ACK"
+  - message:
+      from: "relay"
+      to: "db"
+      text: "Đọc các message chưa gửi theo thứ tự"
+      reply: false
+  - message:
+      from: "relay"
+      to: "kafka"
+      text: "Gửi từng message (acks=all)"
+      reply: false
+  - message:
+      from: "kafka"
+      to: "relay"
+      text: "Xác nhận đã nhận"
+      reply: true
+  - message:
+      from: "relay"
+      to: "db"
+      text: "Đánh dấu đã gửi"
+      reply: false
+  - message:
+      from: "kafka"
+      to: "nhan"
+      text: "Message tồn, điều kiện bán, giá (có messageId để khử trùng)"
+      reply: false
+  - note:
+      over:
+        - "relay"
+        - "kafka"
+      text: "Kafka lỗi: không đánh dấu, thử lại sau; dữ liệu đã ACK không mất"

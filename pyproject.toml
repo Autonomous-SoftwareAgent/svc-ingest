@@ -1,0 +1,29 @@
+[project]
+name = "ingest"
+version = "0.1.0"
+description = "BSN Ingest: nhận tồn, điều kiện bán và giá khách sạn do nhà cung cấp đẩy vào, chuẩn hóa, phát lên Kafka qua outbox"
+requires-python = ">=3.11"
+dependencies = [
+  "fastapi>=0.110",
+  "uvicorn>=0.29",
+  "pydantic>=2.6",
+  "pydantic-settings>=2.2",
+  "sqlalchemy>=2.0",
+  "psycopg[binary]>=3.1",
+  "aiokafka>=0.10",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "httpx>=0.27"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+markers = ["kafka: cần Kafka thật (đặt INGEST_TEST_KAFKA_BOOTSTRAP)"]
