@@ -1,0 +1,233 @@
+schema: 1
+terms:
+  - term: "ACK"
+    means: "Lời báo \"đã nhận, đã kiểm sơ bộ, đã lưu an toàn\" (HTTP 202 kèm TicketId); chỉ trả sau khi DB đã commit, chưa có nghĩa tồn và giá đã cập nhật ở bên nhận"
+    also:
+      - "báo đã nhận"
+      - "202"
+      - "đã nhận và lưu an toàn"
+    refs: []
+    evidence:
+      - file: "src/ingest/core/service.py"
+        line: 3
+      - file: "src/ingest/core/service.py"
+        line: 206
+      - file: "src/ingest/io/http.py"
+        line: 8
+    updated: "2026-10-06"
+  - term: "danh mục"
+    means: "Bản sao để đổi mã của đối tác (khách sạn, phòng, gói giá) sang mã nội bộ và kiểm quyền; nạp qua API nội bộ, tra cứu được nhớ tạm 24 giờ trong từng tiến trình"
+    also:
+      - "đổi mã"
+      - "ánh xạ mã"
+      - "catalog"
+      - "cache 24 giờ"
+    refs: []
+    evidence:
+      - file: "src/ingest/core/catalog.py"
+        line: 1
+      - file: "src/ingest/core/cache.py"
+        line: 9
+      - file: "src/ingest/config.py"
+        line: 29
+    updated: "2026-10-06"
+  - term: "điều kiện bán"
+    means: "Các hạn chế bán theo gói giá: đóng bán, đóng nhận phòng, đóng trả phòng, số đêm tối thiểu và tối đa; gửi lên topic restrictions"
+    also:
+      - "restrictions"
+      - "đóng bán"
+      - "closed"
+      - "số đêm tối thiểu"
+      - "đóng nhận phòng"
+      - "đóng trả phòng"
+    refs: []
+    evidence:
+      - file: "src/ingest/contract.py"
+        line: 17
+      - file: "src/ingest/normalize/inventory_rates_json.py"
+        line: 121
+      - file: "src/ingest/normalize/inventory_rates_json.py"
+        line: 110
+    updated: "2026-10-06"
+  - term: "giá"
+    means: "Giá của một phòng theo gói giá và số khách, kèm phụ thu người lớn và trẻ em; giữ dưới dạng chữ số thập phân, đã gồm thuế, không có tiền tệ; gửi lên topic rates"
+    also:
+      - "rates"
+      - "gói giá"
+      - "rate plan"
+      - "giá theo số khách"
+      - "phụ thu"
+      - "extra adult"
+      - "extra child"
+    refs: []
+    evidence:
+      - file: "src/ingest/contract.py"
+        line: 18
+      - file: "src/ingest/normalize/inventory_rates_json.py"
+        line: 139
+      - file: "src/ingest/core/schema.py"
+        line: 63
+    updated: "2026-10-06"
+  - term: "gửi trùng"
+    means: "Cùng đối tác gửi lại với cùng X-Trace-Id: cùng nội dung thì trả lại TicketId cũ (duplicate=true) và không ghi thêm; khác nội dung thì từ chối 409 mã 40"
+    also:
+      - "gửi lặp"
+      - "gửi lại"
+      - "chống trùng"
+      - "idempotency"
+      - "duplicate"
+    refs: []
+    evidence:
+      - file: "src/ingest/core/service.py"
+        line: 101
+      - file: "src/ingest/core/service.py"
+        line: 177
+      - file: "src/ingest/core/schema.py"
+        line: 89
+    updated: "2026-10-06"
+  - term: "kênh"
+    means: "Header tùy chọn báo lần gửi đến từ kênh nào (cắt còn 128 ký tự); được lưu và đưa vào message, hiện KHÔNG đổi cách xử lý (mục tiêu độ trễ theo kênh chưa đo)"
+    also:
+      - "channel"
+      - "X-Channel-Id"
+      - "kênh sở hữu"
+      - "kênh đối tác"
+    refs: []
+    evidence:
+      - file: "src/ingest/io/http.py"
+        line: 170
+      - file: "src/ingest/core/service.py"
+        line: 150
+    updated: "2026-10-06"
+  - term: "mã lạ"
+    means: "Mã phòng hoặc gói giá không có trong danh mục của đối tác: bỏ dòng đó với mã lỗi 10 (mỗi mã báo một lần), các dòng còn lại vẫn đi; hết dòng hợp lệ thì từ chối cả lần gửi mã 12"
+    also:
+      - "mã phòng lạ"
+      - "mã gói giá lạ"
+      - "lỗi 10"
+      - "unknown code"
+    refs: []
+    evidence:
+      - file: "src/ingest/contract.py"
+        line: 24
+      - file: "src/ingest/core/service.py"
+        line: 122
+      - file: "src/ingest/core/service.py"
+        line: 187
+    updated: "2026-10-06"
+  - term: "nhà cung cấp"
+    means: "Hệ thống bên ngoài đẩy tồn, điều kiện bán và giá vào Ingest bằng HTTP với Basic; mỗi đối tác có tên đăng nhập, định dạng gói riêng và danh sách khách sạn được phép"
+    also:
+      - "đối tác"
+      - "supplier"
+      - "partner"
+      - "PMS"
+    refs: []
+    evidence:
+      - file: "src/ingest/core/schema.py"
+        line: 28
+      - file: "src/ingest/core/schema.py"
+        line: 41
+      - file: "src/ingest/io/http.py"
+        line: 154
+    updated: "2026-10-06"
+  - term: "outbox"
+    means: "Bảng giữ các message đã ACK nhưng chưa chắc đã phát lên Kafka; ghi cùng transaction với lần gửi, relay phát sau theo id tăng dần"
+    also:
+      - "hộp thư đi"
+      - "hàng chờ phát"
+    refs: []
+    evidence:
+      - file: "src/ingest/core/schema.py"
+        line: 92
+      - file: "src/ingest/core/service.py"
+        line: 205
+      - file: "src/ingest/core/relay.py"
+        line: 1
+    updated: "2026-10-06"
+  - term: "phát lặp"
+    means: "Một message có thể tới bên nhận hai lần (chết sau khi Kafka nhận, trước khi đánh dấu; hết giờ nhưng vẫn tới); messageId ổn định theo (TicketId, vị trí) để bên nhận khử trùng"
+    also:
+      - "message lặp"
+      - "messageId"
+      - "giao ít nhất một lần"
+      - "khử trùng"
+    refs: []
+    evidence:
+      - file: "src/ingest/core/service.py"
+        line: 138
+      - file: "src/ingest/core/relay.py"
+        line: 3
+      - file: "src/ingest/contract.py"
+        line: 99
+    updated: "2026-10-06"
+  - term: "relay"
+    means: "Tác vụ nền trong cùng tiến trình đọc outbox và phát lên Kafka; chỉ đánh dấu đã gửi khi Kafka xác nhận, gặp lỗi thì dừng để giữ thứ tự"
+    also:
+      - "tiến trình phát"
+      - "tác vụ nền"
+      - "phát lên Kafka"
+    refs: []
+    evidence:
+      - file: "src/ingest/core/relay.py"
+        line: 1
+      - file: "src/ingest/core/relay.py"
+        line: 49
+      - file: "src/ingest/main.py"
+        line: 94
+    updated: "2026-10-06"
+  - term: "thứ trong tuần"
+    means: "Trường dow (1 = Chủ nhật đến 7 = Thứ bảy) làm khoảng ngày bị cắt thành các đoạn liên tục chỉ gồm những thứ được chọn; đủ 7 ngày thì không cắt"
+    also:
+      - "dow"
+      - "ngày trong tuần"
+      - "tách khoảng ngày"
+    refs: []
+    evidence:
+      - file: "src/ingest/normalize/inventory_rates_json.py"
+        line: 78
+      - file: "src/ingest/normalize/inventory_rates_json.py"
+        line: 82
+    updated: "2026-10-06"
+  - term: "TicketId"
+    means: "Mã (UUID) của một lần gửi đã được nhận; gửi lại cùng X-Trace-Id và cùng nội dung thì trả đúng mã cũ kèm duplicate=true"
+    also:
+      - "phiếu"
+      - "mã phiếu"
+      - "ticket"
+    refs: []
+    evidence:
+      - file: "src/ingest/core/service.py"
+        line: 185
+      - file: "src/ingest/core/schema.py"
+        line: 80
+      - file: "src/ingest/io/http.py"
+        line: 183
+    updated: "2026-10-06"
+  - term: "tồn"
+    means: "Số phòng còn bán được theo ngày (roomstosell); mỗi phòng một message loại inventory, 0 là giá trị thật, trường không gửi thì bị bỏ qua"
+    also:
+      - "số phòng bán được"
+      - "inventory"
+      - "roomstosell"
+    refs: []
+    evidence:
+      - file: "src/ingest/contract.py"
+        line: 16
+      - file: "src/ingest/normalize/inventory_rates_json.py"
+        line: 191
+      - file: "src/ingest/normalize/inventory_rates_json.py"
+        line: 201
+    updated: "2026-10-06"
+  - term: "X-Trace-Id"
+    means: "Header bắt buộc, phải là UUID, do bên gửi đặt; cùng với đối tác tạo thành khóa chống trùng của một lần gửi"
+    also:
+      - "trace id"
+      - "khóa chống trùng"
+    refs: []
+    evidence:
+      - file: "src/ingest/io/http.py"
+        line: 164
+      - file: "src/ingest/core/schema.py"
+        line: 89
+    updated: "2026-10-06"

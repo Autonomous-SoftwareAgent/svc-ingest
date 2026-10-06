@@ -1,0 +1,37 @@
+schema: 1
+relations:
+  - from: "file:ingest:src/ingest/core/relay.py"
+    to: "file:ingest:src/ingest/io/kafka.py"
+    kind: "phát qua cổng Publisher (tiêm lúc chạy)"
+    file: "src/ingest/main.py"
+    line: 96
+    note: "relay chỉ biết giao diện Publisher; main.py chọn KafkaPublisher hoặc LogPublisher theo INGEST_PUBLISHER (main.py:33)"
+    updated: "2026-10-06"
+  - from: "file:ingest:src/ingest/io/http.py"
+    to: "file:ingest:src/ingest/core/auth.py"
+    kind: "gọi qua hook do main.py tiêm"
+    file: "src/ingest/main.py"
+    line: 68
+    note: "Hooks.authenticate = partial(auth.authenticate, engine)"
+    updated: "2026-10-06"
+  - from: "file:ingest:src/ingest/io/http.py"
+    to: "file:ingest:src/ingest/core/catalog.py"
+    kind: "gọi qua hook do main.py tiêm"
+    file: "src/ingest/main.py"
+    line: 71
+    note: "AdminHooks: các API /internal/v1 gọi catalog.* qua partial"
+    updated: "2026-10-06"
+  - from: "file:ingest:src/ingest/io/http.py"
+    to: "file:ingest:src/ingest/core/service.py"
+    kind: "gọi qua hook do main.py tiêm"
+    file: "src/ingest/main.py"
+    line: 55
+    note: "io/http.py không nhập core; hook ingest (main.py:50) chuẩn hóa rồi gọi service.accept"
+    updated: "2026-10-06"
+  - from: "file:ingest:src/ingest/normalize/__init__.py"
+    to: "file:ingest:src/ingest/normalize/inventory_rates_json.py"
+    kind: "nạp lúc chạy"
+    file: "src/ingest/normalize/__init__.py"
+    line: 16
+    note: "load_all dùng importlib nên inventory-rates-json tự đăng ký vào registry khi gói được nhập"
+    updated: "2026-10-06"

@@ -3,4 +3,61 @@
 
 Design -> Spec -> Impl -> Code. Sinh tự động từ `docs/modules/*`.
 
-_(chưa có module nào)_
+## auth
+
+| Design | Spec | Tiêu đề | D | S | I | Code | Vấn đề |
+|---|---|---|---|---|---|---|---|
+| AUTH-D-001 | AUTH-S-001 | Mật khẩu đối tác băm scrypt; tên lạ vẫn tốn thời gian băm | accepted | ready | done | src/ingest/core/auth.py | - |
+
+## catalog
+
+| Design | Spec | Tiêu đề | D | S | I | Code | Vấn đề |
+|---|---|---|---|---|---|---|---|
+| CATL-D-001 | CATL-S-001 | Danh mục chỉ là bản sao để đổi mã; nạp qua API nội bộ; cache 24 giờ theo tiến trình | accepted | ready | done | src/ingest/core/catalog.py<br>src/ingest/core/cache.py | - |
+
+## contract
+
+| Design | Spec | Tiêu đề | D | S | I | Code | Vấn đề |
+|---|---|---|---|---|---|---|---|
+| CONT-D-001 | CONT-S-001 | Một tệp hợp đồng chuẩn là chỗ duy nhất ba lớp gặp nhau | accepted | ready | done | src/ingest/contract.py | - |
+
+## http
+
+| Design | Spec | Tiêu đề | D | S | I | Code | Vấn đề |
+|---|---|---|---|---|---|---|---|
+| HTTP-D-001 | HTTP-S-001 | POST /v1/inventory-rates: thứ tự kiểm, giới hạn kích thước và bảng đổi mã lỗi sang HTTP | accepted | ready | done | src/ingest/io/http.py | - |
+| HTTP-D-002 | HTTP-S-002 | API nội bộ mặc định từ chối, và /healthz kiểm cơ sở dữ liệu thật | accepted | ready | deviated | src/ingest/io/http.py<br>src/ingest/main.py | - |
+
+## intake
+
+| Design | Spec | Tiêu đề | D | S | I | Code | Vấn đề |
+|---|---|---|---|---|---|---|---|
+| INTK-D-001 | INTK-S-001 | ACK chỉ sau khi commit: ghi lần gửi và outbox trong một transaction | accepted | ready | deviated | src/ingest/core/service.py<br>src/ingest/core/schema.py | - |
+| INTK-D-002 | INTK-S-002 | Chống trùng theo (đối tác, X-Trace-Id) kèm mã băm nội dung | accepted | ready | done | src/ingest/core/service.py<br>src/ingest/core/schema.py | - |
+| INTK-D-003 | INTK-S-003 | Đổi mã sang mã nội bộ, bỏ dòng mã lạ, messageId ổn định, khóa phân vùng theo phòng và gói giá | accepted | ready | done | src/ingest/core/service.py | - |
+
+## kafka
+
+| Design | Spec | Tiêu đề | D | S | I | Code | Vấn đề |
+|---|---|---|---|---|---|---|---|
+| KAFK-D-001 | KAFK-S-001 | KafkaPublisher: acks=all, producer idempotent, tạo lười và tạo lại sau lỗi | accepted | ready | done | src/ingest/io/kafka.py<br>src/ingest/io/publishers.py | - |
+
+## normalize
+
+| Design | Spec | Tiêu đề | D | S | I | Code | Vấn đề |
+|---|---|---|---|---|---|---|---|
+| NORM-D-001 | NORM-S-001 | Mỗi định dạng của nhà cung cấp là một module tự đăng ký; lỗi một dòng khác lỗi cả gói | accepted | ready | deviated | src/ingest/normalize/__init__.py<br>src/ingest/normalize/registry.py<br>src/ingest/normalize/inventory_rates_json.py | - |
+| NORM-D-002 | NORM-S-002 | Quy ước đọc gói inventory-rates-json: bỏ trường không gửi, tách theo thứ trong tuần, giữ giá dạng chữ | accepted | ready | done | src/ingest/normalize/inventory_rates_json.py | - |
+
+## relay
+
+| Design | Spec | Tiêu đề | D | S | I | Code | Vấn đề |
+|---|---|---|---|---|---|---|---|
+| RELY-D-001 | RELY-S-001 | Relay phát theo thứ tự id, chỉ đánh dấu đã gửi khi broker xác nhận, gặp lỗi thì dừng | accepted | ready | done | src/ingest/core/relay.py | - |
+| RELY-D-002 | RELY-S-002 | Giao nhận ít nhất một lần: phát lặp là chấp nhận được, bên nhận khử trùng theo messageId | accepted | ready | done | src/ingest/core/relay.py<br>src/ingest/core/service.py | - |
+
+## wiring
+
+| Design | Spec | Tiêu đề | D | S | I | Code | Vấn đề |
+|---|---|---|---|---|---|---|---|
+| WIRE-D-001 | WIRE-S-001 | main.py là điểm nối duy nhất; relay chạy nền trong cùng tiến trình; cấu hình từ biến INGEST_* | accepted | ready | done | src/ingest/main.py<br>src/ingest/config.py | - |
