@@ -1,0 +1,23 @@
+# Không đưa vào build context: nguồn không cần, tài liệu, bí mật, rác cục bộ.
+# Kho Docker Hub là công khai: bí mật lọt vào một bản là lộ hẳn.
+.git
+.claude
+.github
+.env*
+*.pem
+*.key
+docs
+tests
+tools
+**/*.md
+docker-compose.yml
+Dockerfile
+.dockerignore
+.gitignore
+.pytest_cache
+.venv
+node_modules
+__pycache__
+**/__pycache__
+*.egg-info
+*.log

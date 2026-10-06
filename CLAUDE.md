@@ -39,6 +39,11 @@ Quy tắc chung cho mọi dịch vụ và cách làm việc (một harness duy n
 - Chạy cục bộ: sao `.env.example` thành `.env`, rồi `docker compose up --build -d` (Ingest, PostgreSQL, Kafka một nút). Gửi thử: `python tools/sim/supplier.py --user ... --password ...` sau khi đăng ký đối tác và danh mục qua `/internal/v1/...`.
 - Kiểm tài liệu (từ `BSN_/`): `node .claude/plugin/mcp/cli.js --service ingest check`.
 
+## CI và ghim bản mới (S-023; cách làm ở skill `cicd`)
+- Nhánh chính là `main`; chỉ `main` được đóng gói. Repo có `bsn.ci.json`, `.github/workflows/ci.yml` (job `test` rồi job `image` gọi workflow chung của nền) và `.dockerignore`. Trên GitHub CI chỉ chạy được test SQLite và PostgreSQL; ba ca Kafka tự bỏ qua vì cần `docker pause` broker.
+- `Dockerfile` cài thư viện từ `pyproject.toml` TRƯỚC khi chép `src`: sửa mã chỉ làm lại lớp mã. Thêm phụ thuộc thì sửa `pyproject.toml` (lớp thư viện sẽ được dựng lại).
+- Ghim bản mới: commit (phải có thay đổi mã, `Dockerfile` hoặc `pyproject.toml`; commit chỉ sửa `docs/**` hay `*.md` không có bản), chạy test, rồi từ `BSN_/` chạy `node infra/bsn.js pin ingest --apply` và commit tờ `infra/services/ingest.json` ở repo nền. Phiên ingest chỉ ghi đúng tờ của mình, không sửa phần còn lại của `infra/`; ghim khi người dùng bảo.
+
 ## Sơ đồ (docs/diagrams/, khai bằng `diagram_save`)
 - Nghiệp vụ: `trinh-tu-nhan-lan-gui` (trình tự một lần gửi), `luong-xu-ly-tung-dong` (luồng xử lý một dòng dữ liệu).
 - Kiến trúc: `ket-noi-thanh-phan` (kết nối các thành phần), `trang-thai-message-outbox` (trạng thái một message trong outbox).
