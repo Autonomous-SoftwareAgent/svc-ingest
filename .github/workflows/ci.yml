@@ -1,8 +1,8 @@
-# CI của Ingest (S-023). Job test là của dịch vụ; job image là của nền (đóng gói, quét bí mật, đẩy Docker Hub).
+# CI của Ingest (S-023, S-028). Job test là của dịch vụ; job image gọi workflow dùng chung ở repo tochuc-cu/deploy (đóng gói, quét bí mật, đẩy Docker Hub).
 # Test chạy trong ảnh Python 3.13 (ghim bằng mã băm) để không cần thêm action cài Python; PostgreSQL chạy kèm.
 # Ba ca RQM trong tests/test_kafka_rqm.py cần broker thật và quyền `docker pause` container: trên GitHub chúng tự BỎ QUA
 # (thiếu INGEST_TEST_KAFKA_*), tức CI KHÔNG phủ phần Kafka. Không dùng broker dùng chung của hệ cho ca đó.
-# Mã commit của action là bản đã được workflow chung của nền ghim (service-image.yml).
+# Mã commit của action là bản đã được workflow chung ở repo deploy ghim (service-image.yml).
 name: ci
 on:
   push:
@@ -33,5 +33,5 @@ jobs:
       - run: python -m pytest -p no:cacheprovider -ra
   image:
     needs: test
-    uses: tochuc-cu/platform/.github/workflows/service-image.yml@main
+    uses: tochuc-cu/deploy/.github/workflows/service-image.yml@main
     secrets: inherit

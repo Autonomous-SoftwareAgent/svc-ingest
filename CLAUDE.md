@@ -42,7 +42,7 @@ Quy tắc chung cho mọi dịch vụ và cách làm việc (một harness duy n
 ## CI và ghim bản mới (S-023; cách làm ở skill `cicd`)
 - Nhánh chính là `main`; chỉ `main` được đóng gói. Repo có `bsn.ci.json`, `.github/workflows/ci.yml` (job `test` rồi job `image` gọi workflow chung của nền) và `.dockerignore`. Trên GitHub CI chỉ chạy được test SQLite và PostgreSQL; ba ca Kafka tự bỏ qua vì cần `docker pause` broker.
 - `Dockerfile` cài thư viện từ `pyproject.toml` TRƯỚC khi chép `src`: sửa mã chỉ làm lại lớp mã. Thêm phụ thuộc thì sửa `pyproject.toml` (lớp thư viện sẽ được dựng lại).
-- Ghim bản mới: commit (phải có thay đổi mã, `Dockerfile` hoặc `pyproject.toml`; commit chỉ sửa `docs/**` hay `*.md` không có bản), chạy test, rồi từ `BSN_/` chạy `node infra/bsn.js pin ingest --apply` và commit tờ `infra/services/ingest.json` ở repo nền. Phiên ingest chỉ ghi đúng tờ của mình, không sửa phần còn lại của `infra/`; ghim khi người dùng bảo.
+- Ghim bản mới: commit (phải có thay đổi mã, `Dockerfile` hoặc `pyproject.toml`; commit chỉ sửa `docs/**` hay `*.md` không có bản), chạy test, rồi từ `BSN_/` chạy `node infra/bsn.js pin ingest --apply`, rồi `git -C infra add services/ingest.json` và `git -C infra commit -m "ghim ingest <mã commit>"`. Tờ `infra/services/ingest.json` thuộc repo `tochuc-cu/deploy` (`BSN_/infra/`, S-028), không còn thuộc repo gốc. `git -C infra push` (workflow `pins` chạy) chỉ khi người dùng bảo. Phiên ingest chỉ ghi đúng tờ của mình, không sửa phần còn lại của `infra/`; ghim khi người dùng bảo.
 
 ## Sơ đồ (docs/diagrams/, khai bằng `diagram_save`)
 - Nghiệp vụ: `trinh-tu-nhan-lan-gui` (trình tự một lần gửi), `luong-xu-ly-tung-dong` (luồng xử lý một dòng dữ liệu).
