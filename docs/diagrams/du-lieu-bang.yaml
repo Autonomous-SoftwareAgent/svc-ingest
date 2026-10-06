@@ -1,0 +1,257 @@
+id: "du-lieu-bang"
+type: "erd"
+title: "Các bảng PostgreSQL của Ingest"
+tab: "architecture"
+sources:
+  - "src/ingest/core/schema.py"
+explain:
+  meaning: "Ingest nhận từ đối tác (nhà cung cấp) các lô tồn phòng, điều kiện bán và giá của khách sạn. Sáu bảng này là toàn bộ chỗ nó lưu: ai được gửi (partner), được gửi cho khách sạn nào và đổi mã phòng, mã gói giá ra mã nội bộ thế nào (hotel_access, room_map, rate_plan_map), mỗi lần gửi đã được xác nhận (submission) và các message chờ phát lên Kafka (outbox). Các bảng không có cột số phòng còn lại hay giá hiện tại, nhưng outbox.payload giữ mọi giá trị đã nhận. Một lô chỉ được báo đã nhận sau khi submission và outbox cùng được ghi bền, và khóa chống trùng làm cho gửi lại không tạo ra hai lần cập nhật."
+  read:
+    - "Đọc từ bảng partner ở gốc: đối tác có nhiều khách sạn được phép (hotel_access) và có nhiều lần gửi (submission)."
+    - "hotel_access là nút giữa: mỗi dòng là một khách sạn mà đối tác được gửi cho; room_map và rate_plan_map treo dưới nó, nối bằng cặp cột partner_id và hotel_code."
+    - "Khóa chính ghép (nhiều cột cùng là PK) nghĩa là cặp hay bộ ba cột đó mới là định danh của dòng, ví dụ room_map định danh bằng partner_id, hotel_code, room_code."
+    - "UK là ràng buộc duy nhất. Hai cột cùng ghi chú trên submission (partner_id, trace_id) là MỘT ràng buộc trên cặp; partner.name và partner.username thì là hai ràng buộc riêng."
+    - "outbox và submission không nối với nhau bằng đường nào trên hình dù cùng có ticket_id; xem phần dễ hiểu nhầm."
+    - "Cột có ghi chú cho phép trống là cột không bắt buộc; mọi cột còn lại bắt buộc có giá trị."
+  details:
+    - term: "partner"
+      text: "Một đối tác gửi dữ liệu: tên đăng nhập, mật khẩu đã băm bằng scrypt (không lưu mật khẩu thô), tên định dạng gói tin của đối tác và cờ đang hoạt động. Ghi bằng API nội bộ (catalog.register_partner), đọc khi đăng nhập (auth.authenticate)."
+    - term: "partner.username"
+      text: "Tên đăng nhập, duy nhất toàn hệ. Đăng nhập chỉ chấp nhận đối tác có active đúng; đối tác bị tắt thì coi như không tồn tại."
+    - term: "partner.format"
+      text: "Tên định dạng gói tin của đối tác (hiện mã nguồn chỉ đăng ký inventory-rates-json). Khi nhận lô, dịch vụ tra tên này để chọn bộ chuẩn hóa."
+    - term: "hotel_access"
+      text: "Quyền theo khách sạn: đối tác này được gửi cho khách sạn có mã hotel_code (mã do đối tác biết) và mã đó ứng với hotel_id nội bộ. Không có dòng ở đây thì lô bị từ chối với lỗi 31 (service.accept)."
+    - term: "hotel_access.hotel_id"
+      text: "Mã khách sạn nội bộ của hệ BSN, đưa vào message phát ra. Là chuỗi do người vận hành nhập qua API nội bộ; trong cơ sở dữ liệu này không có bảng khách sạn nào để nối tới."
+    - term: "room_map"
+      text: "Bảng đổi mã phòng: room_code của đối tác sang room_id nội bộ, riêng cho từng cặp đối tác và khách sạn. Mã phòng lạ thì dòng đó bị bỏ, lỗi mã 10 chỉ ghi một lần cho mỗi mã lạ khác nhau (không mỗi dòng bị bỏ)."
+    - term: "rate_plan_map"
+      text: "Bảng đổi mã gói giá: rate_plan_code của đối tác sang rate_plan_id nội bộ, cũng theo cặp đối tác và khách sạn. Gói giá lạ xử lý như phòng lạ. Nếu không dòng nào sống sót thì cả lô bị từ chối (lỗi 12) và không lưu gì."
+    - term: "submission"
+      text: "Nhật ký mỗi lần gửi đã được xác nhận: ticketId trả cho đối tác, mã vết trace_id đối tác tự gửi, mã băm nội dung, số message sinh ra và các dòng bị bỏ. Chỉ được ghi cùng giao dịch với outbox, sau đó mới báo đã nhận."
+    - term: "submission.trace_id"
+      text: "Khóa chống trùng do đối tác gửi qua header X-Trace-Id. Cùng đối tác, cùng trace_id: nếu nội dung (body_hash) giống thì trả lại ticket cũ, nếu khác thì từ chối với lỗi 40."
+    - term: "submission.body_hash"
+      text: "Mã băm sha256 của thân yêu cầu. Dùng để phân biệt gửi lại y hệt (an toàn) với dùng lại cùng trace_id cho nội dung khác (từ chối)."
+    - term: "submission.row_errors"
+      text: "Văn bản chứa danh sách JSON các dòng bị bỏ (mã lỗi, mô tả, đường dẫn). Cơ sở dữ liệu chỉ coi nó là văn bản thường; cấu trúc bên trong do mã Python tự ghi và đọc (service._errors_json)."
+    - term: "submission.messages"
+      text: "Số message đã sinh ra cho lần gửi này, bằng số dòng chèn vào outbox."
+    - term: "outbox"
+      text: "Hộp thư đi: mỗi dòng là một message chờ phát lên Kafka. Ghi cùng giao dịch với submission; relay (một việc chạy nền trong chính ứng dụng web, bật khi relay_enabled) đọc theo id tăng dần rồi phát."
+    - term: "outbox.message_id"
+      text: "Mã message ổn định, tính từ ticketId và thứ tự của update SAU khi chuẩn hóa đã tách gói (không phải số dòng trong gói của đối tác), duy nhất toàn bảng. Được gửi trong payload và header message-id; việc dùng nó để khử trùng là việc của bên nhận."
+    - term: "outbox.sent_at_us"
+      text: "Giờ máy cục bộ (micro giây từ 1970) lúc relay đánh dấu, ngay sau khi publish() trả về không lỗi. Để trống nghĩa là chưa phát hoặc phát lỗi. Với Kafka thật, trả về không lỗi nghĩa là broker đã xác nhận; với publisher=log thì không có Kafka nào."
+    - term: "outbox.attempts"
+      text: "Số lần phát lỗi đã ghi nhận; relay tăng lên mỗi khi phát một message thất bại. Mã hiện chỉ ghi chứ chưa dùng nó để quyết định gì (tìm trong src và tests chỉ thấy nơi ghi)."
+    - term: "outbox.payload"
+      text: "Nội dung message dạng văn bản JSON gọn, đã chứa hotelId, roomId, ratePlanId đổi sang mã nội bộ, ngày áp dụng và dữ liệu giá hay tồn do đối tác gửi."
+    - term: "outbox.key"
+      text: "Khóa message Kafka: hotel_id:room_id, thêm :plan_id nếu có gói giá. Tồn (không gói giá) và giá của cùng một phòng có khóa khác nhau, và ba loại message đi ba topic khác nhau. Thứ tự được giữ theo (phòng, gói giá) trong một topic."
+  pitfalls:
+    - "Hình chỉ vẽ cột và ràng buộc. Chỉ mục thường không vẽ: schema.py còn khai ix_outbox_unsent trên (sent_at_us, id) để relay tìm nhanh message chưa gửi theo thứ tự, nhưng chỉ mục này không hiện trên hình."
+    - "Nhiều cột nghe như khóa ngoại nhưng KHÔNG có khóa ngoại thật: outbox.ticket_id không nối tới submission, submission.hotel_code không nối tới hotel_access, partner.format chỉ là tên khớp bộ chuẩn hóa trong mã, còn hotel_id, room_id, rate_plan_id là mã của hệ khác. Các liên kết này do mã giữ."
+    - "Trên room_map và rate_plan_map, partner_id và hotel_code được đánh dấu FK vì chúng là một khóa ngoại GHÉP trỏ tới hotel_access. Không có khóa ngoại riêng từ hai bảng này tới partner; đường nối trên hình đi qua hotel_access."
+    - "Hai cột văn bản chứa JSON: submission.row_errors và outbox.payload. Cơ sở dữ liệu không kiểm cấu trúc bên trong và hình không liệt kê các trường đó; xem service.py (_errors_json, _build) để biết dạng thật."
+    - "Không đoạn mã nào trong src xóa dòng outbox hay submission, nên hai bảng chỉ lớn dần và outbox.payload giữ mọi giá trị đã nhận. Chưa thấy việc dọn dẹp nào trong mã; cần vận hành tự lo."
+    - "Relay giả định chỉ MỘT bản chạy, nhưng nó khởi động trong MỌI bản ứng dụng. Chạy nhiều worker hay bản sao thì giả định bị phá, trừ khi tắt INGEST_RELAY_ENABLED ở tất cả trừ một. Khóa chống trùng chỉ theo (partner_id, trace_id), không theo nội dung."
+  basis: "7e937e2e52b65196"
+entities:
+  - id: "hotel_access"
+    store: "table"
+    columns:
+      - type: "integer"
+        name: "partner_id"
+        keys:
+          - "PK"
+          - "FK"
+      - type: "varchar(128)"
+        name: "hotel_code"
+        keys:
+          - "PK"
+      - type: "varchar(128)"
+        name: "hotel_id"
+        keys: []
+      - type: "varchar(256)"
+        name: "name"
+        keys: []
+        note: "cho phép trống"
+  - id: "outbox"
+    store: "table"
+    columns:
+      - type: "bigint"
+        name: "id"
+        keys:
+          - "PK"
+      - type: "varchar(36)"
+        name: "message_id"
+        keys:
+          - "UK"
+      - type: "varchar(36)"
+        name: "ticket_id"
+        keys: []
+      - type: "varchar(16)"
+        name: "kind"
+        keys: []
+      - type: "varchar(400)"
+        name: "key"
+        keys: []
+      - type: "text"
+        name: "payload"
+        keys: []
+      - type: "bigint"
+        name: "created_at_us"
+        keys: []
+      - type: "bigint"
+        name: "sent_at_us"
+        keys: []
+        note: "cho phép trống"
+      - type: "integer"
+        name: "attempts"
+        keys: []
+  - id: "partner"
+    store: "table"
+    columns:
+      - type: "integer"
+        name: "id"
+        keys:
+          - "PK"
+      - type: "varchar(128)"
+        name: "name"
+        keys:
+          - "UK"
+      - type: "varchar(128)"
+        name: "username"
+        keys:
+          - "UK"
+      - type: "varchar(256)"
+        name: "password_hash"
+        keys: []
+      - type: "varchar(64)"
+        name: "format"
+        keys: []
+      - type: "bool"
+        name: "active"
+        keys: []
+      - type: "bigint"
+        name: "created_at_us"
+        keys: []
+  - id: "rate_plan_map"
+    store: "table"
+    columns:
+      - type: "integer"
+        name: "partner_id"
+        keys:
+          - "PK"
+          - "FK"
+      - type: "varchar(128)"
+        name: "hotel_code"
+        keys:
+          - "PK"
+          - "FK"
+      - type: "varchar(128)"
+        name: "rate_plan_code"
+        keys:
+          - "PK"
+      - type: "varchar(128)"
+        name: "rate_plan_id"
+        keys: []
+      - type: "varchar(256)"
+        name: "name"
+        keys: []
+        note: "cho phép trống"
+  - id: "room_map"
+    store: "table"
+    columns:
+      - type: "integer"
+        name: "partner_id"
+        keys:
+          - "PK"
+          - "FK"
+      - type: "varchar(128)"
+        name: "hotel_code"
+        keys:
+          - "PK"
+          - "FK"
+      - type: "varchar(128)"
+        name: "room_code"
+        keys:
+          - "PK"
+      - type: "varchar(128)"
+        name: "room_id"
+        keys: []
+      - type: "varchar(256)"
+        name: "name"
+        keys: []
+        note: "cho phép trống"
+  - id: "submission"
+    store: "table"
+    columns:
+      - type: "varchar(36)"
+        name: "ticket_id"
+        keys:
+          - "PK"
+      - type: "integer"
+        name: "partner_id"
+        keys:
+          - "FK"
+          - "UK"
+        note: "duy nhất theo (partner_id, trace_id)"
+      - type: "varchar(36)"
+        name: "trace_id"
+        keys:
+          - "UK"
+        note: "duy nhất theo (partner_id, trace_id)"
+      - type: "varchar(64)"
+        name: "body_hash"
+        keys: []
+      - type: "varchar(128)"
+        name: "channel_id"
+        keys: []
+        note: "cho phép trống"
+      - type: "varchar(128)"
+        name: "hotel_code"
+        keys: []
+      - type: "bigint"
+        name: "received_at_us"
+        keys: []
+      - type: "integer"
+        name: "messages"
+        keys: []
+      - type: "text"
+        name: "row_errors"
+        keys: []
+relations:
+  - from: "partner"
+    to: "hotel_access"
+    from_card: "one"
+    to_card: "many"
+    label: "partner_id"
+  - from: "hotel_access"
+    to: "rate_plan_map"
+    from_card: "one"
+    to_card: "many"
+    label: "partner_id, hotel_code"
+  - from: "hotel_access"
+    to: "room_map"
+    from_card: "one"
+    to_card: "many"
+    label: "partner_id, hotel_code"
+  - from: "partner"
+    to: "submission"
+    from_card: "one"
+    to_card: "many"
+    label: "partner_id"
+generated:
+  reader: "postgres"
+  command:
+    - "py"
+    - "-3"
+    - "-c"
+    - "import os, sys; sys.path.insert(0, 'src'); from sqlalchemy import create_engine; from ingest.core.schema import create_all; create_all(create_engine(os.environ['INGEST_DATABASE_URL']))"
+  url_env: "INGEST_DATABASE_URL"
+  url_format: "postgresql+psycopg://{user}:{password}@{host}:{port}/{db}"
+  tables: []
+  basis: "80edb9f408ffebb9"

@@ -42,3 +42,6 @@ Quy tắc chung cho mọi dịch vụ và cách làm việc (một harness duy n
 ## Sơ đồ (docs/diagrams/, khai bằng `diagram_save`)
 - Nghiệp vụ: `trinh-tu-nhan-lan-gui` (trình tự một lần gửi), `luong-xu-ly-tung-dong` (luồng xử lý một dòng dữ liệu).
 - Kiến trúc: `ket-noi-thanh-phan` (kết nối các thành phần), `trang-thai-message-outbox` (trạng thái một message trong outbox).
+- Dữ liệu: `du-lieu-bang` (6 bảng PostgreSQL). Sơ đồ này do công cụ TỰ SINH từ cơ sở dữ liệu thật, không khai tay: sửa `src/ingest/core/schema.py` xong thì gọi `diagram_generate` với `id="du-lieu-bang"` (cần hạ tầng local đang chạy) rồi viết lại phần giải thích; `check` sẽ nhắc khi quên.
+- Kiểu và giao diện: `kieu-vao-ra-chuan-hoa` (hợp đồng chuẩn, lớp vào/ra, lớp chuẩn hóa), `kieu-logic-luu-tru` (logic nội bộ và nơi lưu). Đổi import giữa các module thì sửa hai sơ đồ này.
+- Mỗi dịch vụ phải đủ năm loại sơ đồ (luồng, trình tự, trạng thái, dữ liệu, lớp); xem còn thiếu gì bằng `diagram_list`.
