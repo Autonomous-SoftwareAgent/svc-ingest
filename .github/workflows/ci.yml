@@ -3,10 +3,13 @@
 # Ba ca RQM trong tests/test_kafka_rqm.py cần broker thật và quyền `docker pause` container: trên GitHub chúng tự BỎ QUA
 # (thiếu INGEST_TEST_KAFKA_*), tức CI KHÔNG phủ phần Kafka. Không dùng broker dùng chung của hệ cho ca đó.
 # Mã commit của action là bản đã được workflow chung ở repo deploy ghim (service-image.yml).
+# Khai báo trước, build sau (S-029): job image chỉ đóng gói khi commit đang chạy trùng commit đã ghim trong
+# services/ingest.json của repo deploy. Lỡ đẩy mã trước khi ghim: ghim xong thì chạy tay workflow này (workflow_dispatch).
 name: ci
 on:
   push:
   pull_request:
+  workflow_dispatch:
 permissions:
   contents: read
 jobs:
