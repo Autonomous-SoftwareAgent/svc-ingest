@@ -55,7 +55,7 @@ explain:
     - "Mũi tên đậm cuối gộp cả chiều ngược: relay đọc outbox từ PostgreSQL rồi ghi dấu đã gửi trở lại."
     - "Sơ đồ là cấu trúc; thứ tự thời gian của một lần gửi xem ở sơ đồ trình tự trong tab Nghiệp vụ."
     - "Kafka mới được thử với broker một nút chạy cục bộ; bên nhận chưa tồn tại."
-  basis: "fc62c0c68952e07c"
+  basis: "811e7ce43e3a26c7"
 direction: "TB"
 groups:
   - id: "ben_gui"

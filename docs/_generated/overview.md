@@ -3,7 +3,7 @@
 
 Cửa nhận tồn phòng, điều kiện bán và giá khách sạn do nhà cung cấp đẩy vào. Kiểm người gửi và quyền theo khách sạn, đổi mã phòng và gói giá sang mã nội bộ, chống trùng, lưu bền rồi mới báo đã nhận, sau đó phát lên Kafka. Không giữ số phòng hay giá hiện tại và không tính giá.
 
-Cập nhật: 2026-10-06. Bản cho người đọc: BSN_/docs/portal/ingest/index.html (sinh từ cùng nguồn).
+Cập nhật: 2026-10-07. Bản cho người đọc: BSN_/docs/portal/ingest/index.html (sinh từ cùng nguồn).
 
 ## Nghiệp vụ
 

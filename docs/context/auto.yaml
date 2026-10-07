@@ -4,8 +4,8 @@ diagrams:
     review:
       verdict: "đúng"
       note: "Số tệp mỗi lớp khớp thư mục thật; số lệnh nhập khớp (core->contract 4, io 3, normalize 2, main->core 6). Không có cạnh ngược lên main/config."
-      basis: "f8f76f42723ebac0"
-      at: "2026-10-06"
+      basis: "d7d0090f6c5b45a7"
+      at: "2026-10-07"
     explain:
       meaning: "Sơ đồ gom các tệp mã thành năm nhóm và cho biết nhóm nào nhập nhóm nào. Nó trả lời nhanh câu hỏi: dịch vụ có giữ đúng nguyên tắc ba lớp, một chiều không. Với Ingest, điều đó nghĩa là phần quyết định có nhận dữ liệu của nhà cung cấp hay không, và có ghi xuống DB hay không, không phụ thuộc vào HTTP hay Kafka."
       read:
@@ -17,7 +17,7 @@ diagrams:
         - term: "Hợp đồng chuẩn"
           text: "Một tệp contract.py: loại message, mã lỗi, kiểu dữ liệu chuẩn và cổng Publisher. Là chỗ duy nhất ba lớp gặp nhau."
         - term: "Lớp chuẩn hóa"
-          text: "normalize/: mỗi định dạng của nhà cung cấp một module (hiện chỉ inventory-rates-json), tự đăng ký vào registry. Thêm định dạng là thêm tệp."
+          text: "normalize/: mỗi định dạng của nhà cung cấp một module (hiện chỉ inventory_rates_json), tự đăng ký vào registry. Thêm định dạng là thêm tệp."
         - term: "Lớp logic nội bộ"
           text: "core/: nhận lần gửi, chống trùng, đổi mã, outbox, relay, danh mục, xác thực, cache, bảng PostgreSQL."
         - term: "Lớp vào/ra"
@@ -28,13 +28,13 @@ diagrams:
         - "Số lệnh nhập chỉ đếm nhập tĩnh; việc nạp module chuẩn hóa bằng importlib không được đếm."
         - "Hình không nói lớp nào được phép nhập lớp nào: luật đó nằm trong tests/test_layers.py và CONVENTIONS.md, hình chỉ cho thấy hiện trạng."
         - "Ingest chưa có lớp thứ hai cho cùng một việc (một định dạng, một broker thật), nên chưa kiểm được chuyện thêm bên ngoài thứ hai có thật sự không sửa lớp cũ."
-      basis: "f8f76f42723ebac0"
+      basis: "d7d0090f6c5b45a7"
   - id: "tu-sinh-cua-vao-ra"
     review:
       verdict: "đúng"
       note: "8 đường dẫn khớp io/http.py (dòng 145-229), 6 bảng khớp core/schema.py. Topic là mặc định config.py:18-20; mã không tạo topic (io/kafka.py), nhãn \"khai ở infra\" chỉ đúng khi infra tạo sẵn."
-      basis: "1e54059ca3ed2468"
-      at: "2026-10-06"
+      basis: "874a485a60bbe4fe"
+      at: "2026-10-07"
     explain:
       meaning: "Sơ đồ liệt kê mọi cửa vào và cửa ra của Ingest: nhà cung cấp và dịch vụ nội bộ gọi vào đâu, dữ liệu nằm ở bảng nào, tin phát lên topic nào, và dịch vụ phụ thuộc vào gì. Với người nhận phòng và giá, đây là chỗ biết dữ liệu vào bằng cửa nào và đi ra bằng topic nào."
       read:
@@ -65,13 +65,13 @@ diagrams:
         - "Hình không nói thứ tự: các message của một phòng cùng khóa phân vùng giữ thứ tự, nhưng giữa các phòng và giữa ba topic thì không."
         - "Cửa ra duy nhất là Kafka; không có webhook hay gọi HTTP ra ngoài."
         - "Mới thử với Kafka và Redpanda một nút chạy cục bộ; broker production chưa kiểm."
-      basis: "1e54059ca3ed2468"
+      basis: "874a485a60bbe4fe"
   - id: "tu-sinh-phu-thuoc-module"
     review:
       verdict: "đúng"
-      note: "Khớp lệnh nhập thật của từng tệp. Chỉ thiếu cạnh nạp động normalize/__init__.py -> inventory_rates_json.py (importlib, dòng 16-19), máy không đọc ra; đã khai bằng context_relate."
-      basis: "a691516d05edb8f8"
-      at: "2026-10-06"
+      note: "Khớp lệnh nhập thật của từng tệp (tệp chuẩn hóa nay là inventory_rates_json.py). Chỉ thiếu cạnh nạp động normalize/__init__.py -> inventory_rates_json.py (importlib, dòng 16-19), máy không đọc ra; đã khai bằng context_relate."
+      basis: "c59c5ef42f433b71"
+      at: "2026-10-07"
     explain:
       meaning: "Sơ đồ cho thấy tệp mã nào của Ingest dựa vào tệp nào, theo lệnh nhập đọc từ mã. Điều quan trọng với tồn, giá và đơn: logic nhận lần gửi và ghi outbox (core) không biết gì về HTTP, Kafka hay định dạng của nhà cung cấp, nên đổi nhà cung cấp hay đổi broker không đụng tới chỗ lưu dữ liệu đã nhận."
       read:
@@ -107,4 +107,4 @@ diagrams:
         - "core/service.py không gọi catalog.py hay auth.py; hai tệp đó chỉ do main.py gọi (nạp danh mục qua API nội bộ, xác thực khi có yêu cầu)."
         - "Cạnh nạp động normalize/__init__.py tới inventory_rates_json.py và việc chọn Kafka hay log lúc chạy (INGEST_PUBLISHER) không hiện trên hình."
         - "Ranh giới giữa các lớp được test quét lệnh nhập (tests/test_layers.py) giữ; hình chỉ phản ánh mã đã commit."
-      basis: "a691516d05edb8f8"
+      basis: "c59c5ef42f433b71"

@@ -14,7 +14,7 @@ module: http
 - notes:
 
 ## HTTP-S-002: API nội bộ mặc định từ chối, và /healthz kiểm cơ sở dữ liệu thật
-- spec_hash: 461be4f1
+- spec_hash: a620c138
 - status: deviated
 - code: src/ingest/io/http.py, src/ingest/main.py
 - tests: tests/test_http.py

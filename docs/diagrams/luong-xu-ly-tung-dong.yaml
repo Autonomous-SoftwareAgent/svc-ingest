@@ -33,7 +33,7 @@ explain:
     - "Có những lỗi làm hỏng cả lần gửi mà sơ đồ này không vẽ: gói không đọc được hoặc thiếu khách sạn, phòng (mã 21); quá nhiều cập nhật sau khi tách (mã 24, HTTP 413); khách sạn lạ hoặc không có quyền (mã 31, HTTP 401)."
     - "Chỉ mã 10 do nghiệp vụ quy định; mã 12 và 20 do Ingest tự đặt, chưa thỏa thuận với nhà cung cấp."
     - "Dạng gói và quy ước thứ trong tuần theo mô tả của người dùng; ngày tính cả hai đầu là giả định của Ingest. Cả hai chưa kiểm với nhà cung cấp thật."
-  basis: "eacab43e164dfc66"
+  basis: "6547a697c3b2bd4d"
 direction: "TB"
 groups: []
 nodes:

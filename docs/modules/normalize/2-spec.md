@@ -7,7 +7,7 @@ Design được tách thành yêu cầu, contract, tiêu chí nghiệm thu và t
 
 ## NORM-S-001: Mỗi định dạng của nhà cung cấp là một module tự đăng ký; lỗi một dòng khác lỗi cả gói
 - from: NORM-D-001
-- derived_from: 411a67d2
+- derived_from: 968bcff2
 - status: ready
 - requirement: Có một registry định dạng; thêm định dạng là thêm một tệp trong normalize/. inventory-rates-json đọc InvResRateRequest và trả NormalizedSubmission. Lỗi cả gói thì ném IngestError (21, 24); lỗi một dòng thì bỏ dòng và ghi RowError mã 20 kèm đường dẫn room[i].date[j].
 - contract: parse(body: bytes, limits: Limits) -> NormalizedSubmission(hotel_code, updates, row_errors). Cả gói sai (mã 21): không phải JSON, không phải object, thiếu hotelid (chuỗi không rỗng), thiếu room (danh sách không rỗng). Quá limits.max_updates (mã 24). register(name) ném RuntimeError khi trùng tên; get(name) trả None nếu chưa đăng ký.
@@ -20,7 +20,7 @@ Design được tách thành yêu cầu, contract, tiêu chí nghiệm thu và t
 
 ## NORM-S-002: Quy ước đọc gói inventory-rates-json: bỏ trường không gửi, tách theo thứ trong tuần, giữ giá dạng chữ
 - from: NORM-D-002
-- derived_from: 689986af
+- derived_from: 5329bdf3
 - status: ready
 - requirement: Quy ước đọc dữ liệu inventory-rates-json: bỏ trường không gửi, cờ đóng là chuỗi, tách theo thứ trong tuần, giá giữ dạng chữ thập phân không tiền tệ, khoảng ngày giới hạn.
 - contract: Không gửi hoặc null: bỏ qua; roomstosell số nguyên >= 0 (0 là thật, bool và số thực sai). closed, closedonarrival, closedondeparture: "0" mở, chuỗi khác đóng, rỗng bỏ qua, không phải chuỗi sai. minimumstay, maximumstay nguyên >= 1, max >= min. dow danh sách không rỗng các số 1..7 (1 = Chủ nhật), đủ 7 thì không cắt. date: "value" một ngày hoặc from/to dạng yyyy-MM-dd hợp lệ, to >= from, dài tối đa limits.max_span_days. price: danh sách không rỗng, NumberOfGuests nguyên >= 1 không lặp, value số hữu hạn >= 0, ra chuỗi thập phân giữ nguyên; kèm price_basis "after_tax", age_code "ADULT"; extraadultrate, extrachildrate số >= 0. Restrictions hoặc rates cần rateplanid. Mỗi gói giá (không lặp) một update restrictions và một update rates; mỗi đoạn ngày một update inventory.

@@ -38,7 +38,7 @@ explain:
     - "KafkaPublisher cài Publisher kiểu Protocol (khớp theo hình dạng hàm), không kế thừa tường minh. LogPublisher và MemoryPublisher ở io/publishers.py cũng khớp hợp đồng nhưng không vẽ."
     - "Mỗi hộp là một tệp, không phải lớp Python, trừ Publisher và KafkaPublisher. Chỉ liệt kê thành viên chính."
     - "Ranh giới lớp được giữ bởi tests/test_layers.py quét import; hình không chứng minh điều đó. KafkaPublisher đã chạy với broker một nút cục bộ trong tests/test_kafka_rqm.py (cần biến môi trường). Chưa kiểm: Kafka production và đối tác thật."
-  basis: "1dba661e08c8bb45"
+  basis: "d974d2e4a61f5ac4"
 direction: "TB"
 classes:
   - id: "contract"

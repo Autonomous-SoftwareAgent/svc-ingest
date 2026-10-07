@@ -34,4 +34,4 @@ relations:
     file: "src/ingest/normalize/__init__.py"
     line: 16
     note: "load_all dùng importlib nên inventory-rates-json tự đăng ký vào registry khi gói được nhập"
-    updated: "2026-10-06"
+    updated: "2026-10-07"

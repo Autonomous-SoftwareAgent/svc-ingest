@@ -218,7 +218,7 @@ terms:
         line: 191
       - file: "src/ingest/normalize/inventory_rates_json.py"
         line: 201
-    updated: "2026-10-06"
+    updated: "2026-10-07"
   - term: "X-Trace-Id"
     means: "Header bắt buộc, phải là UUID, do bên gửi đặt; cùng với đối tác tạo thành khóa chống trùng của một lần gửi"
     also:

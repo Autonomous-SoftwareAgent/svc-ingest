@@ -2,7 +2,7 @@ schema: 1
 service: "ingest"
 title: "Ingest (cửa nhận tồn và giá khách sạn)"
 summary: "Cửa nhận tồn phòng, điều kiện bán và giá khách sạn do nhà cung cấp đẩy vào. Kiểm người gửi và quyền theo khách sạn, đổi mã phòng và gói giá sang mã nội bộ, chống trùng, lưu bền rồi mới báo đã nhận, sau đó phát lên Kafka. Không giữ số phòng hay giá hiện tại và không tính giá."
-updated: "2026-10-06"
+updated: "2026-10-07"
 business:
   goal: "Để số phòng còn bán, điều kiện bán và giá mà khách thấy khi tìm và đặt khớp với hệ thống của nhà cung cấp: chuẩn hóa mã, kiểm quyền theo khách sạn, rồi mới đẩy đi."
   users:

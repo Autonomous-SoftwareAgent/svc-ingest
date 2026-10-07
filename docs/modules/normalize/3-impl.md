@@ -6,7 +6,7 @@ module: normalize
 Đã code gì, ở đâu, lệch spec chỗ nào. Ghi qua tool `impl_link`.
 
 ## NORM-S-001: Mỗi định dạng của nhà cung cấp là một module tự đăng ký; lỗi một dòng khác lỗi cả gói
-- spec_hash: 02c31c78
+- spec_hash: 583d88fe
 - status: deviated
 - code: src/ingest/normalize/__init__.py, src/ingest/normalize/registry.py, src/ingest/normalize/inventory_rates_json.py
 - tests: tests/test_normalize.py, tests/test_layers.py
@@ -14,7 +14,7 @@ module: normalize
 - notes:
 
 ## NORM-S-002: Quy ước đọc gói inventory-rates-json: bỏ trường không gửi, tách theo thứ trong tuần, giữ giá dạng chữ
-- spec_hash: 69677ba7
+- spec_hash: fc909552
 - status: done
 - code: src/ingest/normalize/inventory_rates_json.py
 - tests: tests/test_normalize.py
