@@ -1,10 +1,11 @@
-# CI của Ingest (S-023, S-028). Job test là của dịch vụ; job image gọi workflow dùng chung ở repo Autonomous-SoftwareAgent/deploy (đóng gói, quét bí mật, đẩy Docker Hub).
+# CI của Ingest (S-023, S-028). Job test là của dịch vụ; job pin và job image là của repo Autonomous-SoftwareAgent/deploy.
 # Test chạy trong ảnh Python 3.13 (ghim bằng mã băm) để không cần thêm action cài Python; PostgreSQL chạy kèm.
 # Ba ca RQM trong tests/test_kafka_rqm.py cần broker thật và quyền `docker pause` container: trên GitHub chúng tự BỎ QUA
 # (thiếu INGEST_TEST_KAFKA_*), tức CI KHÔNG phủ phần Kafka. Không dùng broker dùng chung của hệ cho ca đó.
 # Mã commit của action là bản đã được workflow chung ở repo deploy ghim (service-image.yml).
-# Khai báo trước, build sau (S-029): job image chỉ đóng gói khi commit đang chạy trùng commit đã ghim trong
-# services/ingest.json của repo deploy. Lỡ đẩy mã trước khi ghim: ghim xong thì chạy tay workflow này (workflow_dispatch).
+# Khai báo trước, build sau (S-029): khai commit nào trong services/ingest.json của repo deploy thì đóng gói đúng commit đó,
+# dù nó là đầu nhánh hay nằm phía dưới (D-010 của nền). Job pin cho biết commit nào chờ đóng gói; job test chạy trên commit
+# đang chạy VÀ trên commit đó; job image đóng gói, quét bí mật, chạy thử rồi đẩy. Ghim sau khi đã đẩy mã: chạy tay workflow này.
 name: ci
 on:
   push:
@@ -13,8 +14,15 @@ on:
 permissions:
   contents: read
 jobs:
+  pin:
+    uses: Autonomous-SoftwareAgent/deploy/.github/workflows/service-pin.yml@main
   test:
+    needs: pin
     runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        ref: ${{ fromJSON(needs.pin.outputs.refs) }}
     container: python:3.13-slim@sha256:bf44cdfcb76cd3b41e879bc058fc37ec5872002ccfde7fcb765e218cde0cd79c
     services:
       postgres:
@@ -32,9 +40,13 @@ jobs:
       INGEST_TEST_DATABASE_URL: postgresql+psycopg://ingest:test@postgres:5432/ingest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ matrix.ref }}
       - run: pip install -e ".[dev]"
       - run: python -m pytest -p no:cacheprovider -ra
   image:
-    needs: test
+    needs: [pin, test]
     uses: Autonomous-SoftwareAgent/deploy/.github/workflows/service-image.yml@main
+    with:
+      commit: ${{ needs.pin.outputs.commit }}
     secrets: inherit
