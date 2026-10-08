@@ -2,6 +2,8 @@
 
 Cập nhật lần cuối: 2026-10-08
 
+Mới nhất (2026-10-08): job `test` trong CI đổi từ PostgreSQL 16 sang 17 (ảnh `postgres:17-alpine` ghim mã băm, cùng bản payment-hub dùng) cho khớp hệ đang chạy. Đã chạy bộ test cục bộ trên PostgreSQL 17.11: 104 qua, 3 bỏ qua (Kafka), 0 hỏng. CHƯA đẩy nên chưa chạy trên GitHub.
+
 ## Mục tiêu
 - [x] Khung dịch vụ theo skill `new-service`, ba lớp, test quét import (`tests/test_layers.py`, đã thử cố ý thêm import sai thì đỏ)
 - [x] Chuẩn hóa gói `inventory-rates-json` (tách `dow`, bỏ qua trường không gửi, cờ đóng/mở, giá thập phân), module đăng ký (`normalize/`)
