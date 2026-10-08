@@ -2,7 +2,7 @@ schema: 1
 service: "ingest"
 title: "Ingest (cửa nhận tồn và giá khách sạn)"
 summary: "Cửa nhận tồn phòng, điều kiện bán và giá khách sạn do nhà cung cấp đẩy vào. Kiểm người gửi và quyền theo khách sạn, đổi mã phòng và gói giá sang mã nội bộ, chống trùng, lưu bền rồi mới báo đã nhận, sau đó phát lên Kafka. Không giữ số phòng hay giá hiện tại và không tính giá."
-updated: "2026-10-07"
+updated: "2026-10-08"
 business:
   goal: "Để số phòng còn bán, điều kiện bán và giá mà khách thấy khi tìm và đặt khớp với hệ thống của nhà cung cấp: chuẩn hóa mã, kiểm quyền theo khách sạn, rồi mới đẩy đi."
   users:
@@ -353,6 +353,20 @@ problems:
       - "INTK-S-001"
       - "HTTP-S-001"
       - "RELY-S-001"
+  - id: "P-015"
+    title: "CI không phủ phần Kafka; chờ có Kafka thật của cả hệ"
+    severity: "medium"
+    status: "open"
+    found: "2026-10-08"
+    updated: "2026-10-08"
+    detail: "Ba ca RQM trong tests/test_kafka_rqm.py (Kafka tạm dừng rồi chạy lại, dịch vụ khởi động lại khi outbox còn tin, tin bị gửi hai lần) cần broker thật và quyền docker pause lên container broker. Job test của CI chạy trong container Python và không dựng broker, nên trên GitHub ba ca tự bỏ qua (lần chạy 37756461447: 104 qua, 3 bỏ qua). Hậu quả: một lỗi chỉ nằm ở io/kafka.py hoặc core/relay.py (mất tin đã báo đã nhận khi Kafka sập, hoặc áp dụng trùng) không làm CI đỏ; bước chạy thử của nền chỉ kiểm /healthz. Hiện chỉ có chạy tay ở máy trước khi ghim bản mới (đã chạy với Kafka và Redpanda một nút cục bộ)."
+    refine: "Người dùng quyết GÁC (qua phiên infra, 2026-10-08): chưa làm, đợi khi build toàn bộ dịch vụ có Kafka thật của cả hệ. Hướng khi làm (phiên infra gợi ý, chưa chạy thật trên GitHub): bỏ container: để job chạy trên runner có docker, cài Python bằng actions/setup-python ghim mã commit, PostgreSQL trong services: có cổng và địa chỉ localhost, broker bật bằng bước docker run có tên cố định rồi đặt INGEST_TEST_KAFKA_BOOTSTRAP và INGEST_TEST_KAFKA_CONTAINER, và thêm một biến chỉ đặt trong ci.yml để thiếu Kafka thì ba ca hỏng thay vì bỏ qua."
+    refs:
+      - "tests/test_kafka_rqm.py"
+      - ".github/workflows/ci.yml"
+      - "RELY-S-001"
+      - "RELY-S-002"
+      - "KAFK-S-001"
 progress:
   done:
     - "Khung dịch vụ theo skill new-service, ba lớp và test quét import"

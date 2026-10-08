@@ -3,7 +3,7 @@
 
 Cửa nhận tồn phòng, điều kiện bán và giá khách sạn do nhà cung cấp đẩy vào. Kiểm người gửi và quyền theo khách sạn, đổi mã phòng và gói giá sang mã nội bộ, chống trùng, lưu bền rồi mới báo đã nhận, sau đó phát lên Kafka. Không giữ số phòng hay giá hiện tại và không tính giá.
 
-Cập nhật: 2026-10-07. Bản cho người đọc: BSN_/docs/portal/ingest/index.html (sinh từ cùng nguồn).
+Cập nhật: 2026-10-08. Bản cho người đọc: BSN_/docs/portal/ingest/index.html (sinh từ cùng nguồn).
 
 ## Nghiệp vụ
 
@@ -134,7 +134,7 @@ Tiếp theo:
 - Thêm kết nối còn thiếu: JetStream, webhook ra, Kafka vào; API replay nếu cần
 - Dịch vụ nhận message (Inventory, worker tồn) và hợp đồng message thật với họ
 
-Vấn đề chưa xong (14):
+Vấn đề chưa xong (15):
 - P-001 [open, medium] Không phát hiện gửi trễ hay đảo thứ tự giữa hai lần gửi (phát hiện 2026-10-05)
   Vấn đề: Gói của nhà cung cấp không có giờ riêng, nên Ingest chỉ gắn giờ nó nhận (receivedAt) và giữ thứ tự trong cùng khóa phân vùng. Hai lần gửi tới đảo thứ tự (lần cũ tới sau lần mới) vẫn được nhận như bình thường và có thể ghi đè số phòng hoặc giá mới bằng dữ liệu cũ ở bên nhận. Lệch với yêu cầu thứ tự theo timestamp ở tài liệu tham chiếu nếu bên nhận cần giờ của nhà cung cấp.
   Tinh chỉnh: Chưa tinh chỉnh. Hướng: xin nhà cung cấp gửi giờ cập nhật trong gói, hoặc Ingest giữ mốc mới nhất theo từng phòng và gói giá (đổi quyết định D-005).
@@ -191,3 +191,7 @@ Vấn đề chưa xong (14):
   Vấn đề: Bộ test hiện có (tests/) CHƯA có: (1) Ca biên: thân rỗng; thân đúng bằng giới hạn và vượt một byte; thân không có Content-Length; UTF-8 sai; dạng UUID khác nhau (hoa, không gạch, ngoặc, urn) phải cùng một khóa; giá 0, âm, rất lớn, NaN, Infinity; ngày 2026-02-30, năm nhuận; khoảng ngày đúng bằng giới hạn và hơn một ngày; mã Unicode; dow sai; cờ không phải chuỗi; roomstosell kiểu sai; hai thân khác nhau cùng trace gửi đồng thời; tên và username đúng 128 và 129 ký tự. (2) Lỗi hạ tầng: mất kết nối DB giữa chừng trên PostgreSQL thật; tiến trình chết sau commit trước khi phát; tiến trình chết giữa lúc ghi submission và outbox; relay không thấy hàng của transaction chưa commit; hai relay cùng lúc; relay sống sót lỗi DB tạm thời; KafkaPublisher đơn vị với producer giả (lỗi tạo lại producer, hết giờ). (3) Tích hợp: giữ thứ tự cùng khóa trong một phân vùng và ba topic đúng loại trên broker thật; broker không với tới được thì lỗi nhanh. Bộ RQM hiện có chỉ chạy được khi có container Kafka riêng để docker pause, chưa chạy với Redpanda của hạ tầng local trong bộ test của repo. (4) Đầu-cuối: chưa có test nào chạy dịch vụ uvicorn thật rồi kiểm hàng trong bảng và tin trên topic cho từng luồng (nhận, gửi lặp, 409, mã lạ, toàn bộ lỗi, khách sạn lạ, nạp danh mục, broker dừng, khởi động lại, healthz). (5) Chưa có test tự động cho vòng đời lifespan, --check-config, tải và độ trễ p99. Đã thử viết và chạy một bộ test bổ sung bên ngoài repo (docs/handoff/ingest-dung-lai/tests, chưa commit): phần chuẩn hóa, lõi, HTTP chạy được với mã hiện tại; phần tích hợp và đầu-cuối chạy được với PostgreSQL 16 và Redpanda một nút tạm.
   Tinh chỉnh: Chưa viết test vào repo (đợt này chỉ ghi danh sách). Ba lệch đã đo từ bộ thử nghiệm ghi ở P-011 đến P-013.
   Tham chiếu: tests/, tests/test_kafka_rqm.py, INTK-S-001, HTTP-S-001, RELY-S-001
+- P-015 [open, medium] CI không phủ phần Kafka; chờ có Kafka thật của cả hệ (phát hiện 2026-10-08)
+  Vấn đề: Ba ca RQM trong tests/test_kafka_rqm.py (Kafka tạm dừng rồi chạy lại, dịch vụ khởi động lại khi outbox còn tin, tin bị gửi hai lần) cần broker thật và quyền docker pause lên container broker. Job test của CI chạy trong container Python và không dựng broker, nên trên GitHub ba ca tự bỏ qua (lần chạy 37756461447: 104 qua, 3 bỏ qua). Hậu quả: một lỗi chỉ nằm ở io/kafka.py hoặc core/relay.py (mất tin đã báo đã nhận khi Kafka sập, hoặc áp dụng trùng) không làm CI đỏ; bước chạy thử của nền chỉ kiểm /healthz. Hiện chỉ có chạy tay ở máy trước khi ghim bản mới (đã chạy với Kafka và Redpanda một nút cục bộ).
+  Tinh chỉnh: Người dùng quyết GÁC (qua phiên infra, 2026-10-08): chưa làm, đợi khi build toàn bộ dịch vụ có Kafka thật của cả hệ. Hướng khi làm (phiên infra gợi ý, chưa chạy thật trên GitHub): bỏ container: để job chạy trên runner có docker, cài Python bằng actions/setup-python ghim mã commit, PostgreSQL trong services: có cổng và địa chỉ localhost, broker bật bằng bước docker run có tên cố định rồi đặt INGEST_TEST_KAFKA_BOOTSTRAP và INGEST_TEST_KAFKA_CONTAINER, và thêm một biến chỉ đặt trong ci.yml để thiếu Kafka thì ba ca hỏng thay vì bỏ qua.
+  Tham chiếu: tests/test_kafka_rqm.py, .github/workflows/ci.yml, RELY-S-001, RELY-S-002, KAFK-S-001
