@@ -8,6 +8,20 @@ Quy tắc chung cho mọi dịch vụ và cách làm việc (một harness duy n
 - Tài liệu ba tầng (design/spec/impl) chỉ ghi qua công cụ MCP `bsn-docs` với `service="ingest"` (`design_record` tạo `docs/modules` lần đầu); không sửa tay. Dịch vụ này CHƯA dùng ba tầng.
 - Trong `docs/` của dịch vụ chỉ có Markdown cho agent, không đặt HTML. Nguồn có cấu trúc của dịch vụ là `docs/service.yaml` (nghiệp vụ, kiến trúc, vấn đề và tiến độ), ghi bằng `bsn-docs`: `service_doc_set`, `problem_record`. Sơ đồ khai bằng `diagram_save`, không tự viết Mermaid. Người đọc xem cổng cục bộ `BSN_/docs/portal/ingest/index.html`, sinh tự động từ nguồn đó sau mỗi commit.
 
+## Đọc gì khi nào
+Tệp này là cửa vào duy nhất của dịch vụ. Thứ tự đọc chung nằm ở skill `services`; dưới đây là tài liệu riêng của ingest.
+
+| Khi | Đọc |
+|---|---|
+| Bắt đầu bất cứ việc gì | [docs/agent/STATUS.md](docs/agent/STATUS.md): đang dở gì, lần gần nhất đổi gì, điều chưa kiểm với hệ thật |
+| Trước khi viết mã | [docs/agent/CONVENTIONS.md](docs/agent/CONVENTIONS.md): ba lớp nằm ở đâu, quy ước mã |
+| Định đổi một cách làm đã có | [docs/agent/DECISIONS.md](docs/agent/DECISIONS.md): D-001 trở đi, vì sao chọn cách hiện tại |
+| Cần bức tranh chung | [docs/_generated/overview.md](docs/_generated/overview.md) (công cụ sinh từ `docs/service.yaml`) |
+| Sửa một phần cụ thể | `docs/modules/<phần>/` (auth, catalog, contract, http, intake, kafka, normalize, relay, wiring): thiết kế, đặc tả, mã và test của phần đó |
+| Mã đổi có làm sơ đồ sai không | mục "Sơ đồ" ở cuối tệp này, rồi skill `diagrams` |
+| Lên bản mới, sửa workflow | mục "CI và ghim bản mới" bên dưới, rồi skill `cicd` |
+| Có ai đang chờ ingest làm gì | các tệp `../../docs/handoff/*-to-ingest-*.md` còn `open` |
+
 ## Ba lớp (nguyên tắc ở ../../CLAUDE.md)
 - Lớp vào/ra: `src/ingest/io/`. `http.py` (nhận lô từ nhà cung cấp, API nội bộ, xác thực Basic và Bearer, đổi mã lỗi sang HTTP), `kafka.py` (phát ra Kafka bằng aiokafka), `publishers.py` (ghi log, bộ nhớ). Không chứa nghiệp vụ, không biết định dạng của đối tác.
 - Lớp chuẩn hóa: `src/ingest/normalize/`. Mỗi định dạng của đối tác một module tự đăng ký bằng `@register("<tên>")` (hiện có `inventory_rates_json.py`). Thêm định dạng là thêm một tệp, không sửa tệp nào đang có.
@@ -40,9 +54,9 @@ Quy tắc chung cho mọi dịch vụ và cách làm việc (một harness duy n
 - Kiểm tài liệu (từ `BSN_/`): `node .claude/plugin/mcp/cli.js --service ingest check`.
 
 ## CI và ghim bản mới (S-023; cách làm ở skill `cicd`)
-- Nhánh chính là `main`; chỉ `main` được đóng gói. Repo có `bsn.ci.json`, `.github/workflows/ci.yml` (job `test` rồi job `image` gọi workflow chung của nền) và `.dockerignore`. Trên GitHub CI chỉ chạy được test SQLite và PostgreSQL; ba ca Kafka tự bỏ qua vì cần `docker pause` broker.
+- Nhánh chính là `main`; chỉ `main` được đóng gói. Repo có `bsn.ci.json`, `.github/workflows/ci.yml` (ba job: `pin` của nền cho biết commit nào chờ đóng gói, `test` chạy trên commit đang đẩy và commit đó, `image` của nền đóng gói đúng commit đã khai) và `.dockerignore`. Trên GitHub CI chỉ chạy được test SQLite và PostgreSQL; ba ca Kafka tự bỏ qua vì cần `docker pause` broker.
 - `Dockerfile` cài thư viện từ `pyproject.toml` TRƯỚC khi chép `src`: sửa mã chỉ làm lại lớp mã. Thêm phụ thuộc thì sửa `pyproject.toml` (lớp thư viện sẽ được dựng lại).
-- **Khai báo trước, build sau (S-029):** job `image` chỉ đóng gói commit đang được ghim trong `infra/services/ingest.json`; lần đẩy khác chỉ chạy test. Thứ tự lên bản mới: (1) commit ở máy và chạy test; (2) từ `BSN_/` chạy `node infra/bsn.js pin ingest --apply`, rồi `git -C infra add services/ingest.json`, `git -C infra commit -m "ghim ingest <mã commit>"`, `git -C infra push`; (3) `git push` repo ingest: test qua thì bản `main-<12 ký tự commit>` được đóng gói. Lỡ đẩy mã trước khi ghim: ghim xong thì chạy tay `gh workflow run ci.yml -R Autonomous-SoftwareAgent/svc-ingest`. `node infra/bsn.js images` báo "CHỜ BUILD" cho commit đã ghim mà chưa có bản. Tờ `infra/services/ingest.json` thuộc repo `Autonomous-SoftwareAgent/deploy` (`BSN_/infra/`, S-028), không thuộc repo gốc. Ghim và đẩy chỉ khi người dùng bảo. Phiên ingest chỉ ghi đúng tờ của mình, không sửa phần còn lại của `infra/`.
+- **Khai báo trước, build sau (S-029):** job `image` chỉ đóng gói commit đang được ghim trong `infra/services/ingest.json`, dù commit đó là đầu nhánh hay nằm phía dưới (D-010 của nền); không có commit chờ thì lần đẩy chỉ chạy test. Thứ tự lên bản mới: (1) commit ở máy và chạy test; (2) từ `BSN_/` chạy `node infra/bsn.js pin ingest --apply`, rồi `git -C infra add services/ingest.json`, `git -C infra commit -m "ghim ingest <mã commit>"`, `git -C infra push`; (3) `git push` repo ingest: test qua thì bản `main-<12 ký tự commit>` được đóng gói. Lỡ đẩy mã trước khi ghim: ghim xong thì chạy tay `gh workflow run ci.yml -R Autonomous-SoftwareAgent/svc-ingest`. `node infra/bsn.js images` báo "CHỜ BUILD" cho commit đã ghim mà chưa có bản. Tờ `infra/services/ingest.json` thuộc repo `Autonomous-SoftwareAgent/deploy` (`BSN_/infra/`, S-028), không thuộc repo gốc. Ghim và đẩy chỉ khi người dùng bảo. Phiên ingest chỉ ghi đúng tờ của mình, không sửa phần còn lại của `infra/`.
 
 ## Sơ đồ (docs/diagrams/, khai bằng `diagram_save`)
 - Nghiệp vụ: `trinh-tu-nhan-lan-gui` (trình tự một lần gửi), `luong-xu-ly-tung-dong` (luồng xử lý một dòng dữ liệu).
