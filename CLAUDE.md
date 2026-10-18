@@ -1,12 +1,12 @@
 # ingest
 
-Quy tắc chung cho mọi dịch vụ và cách làm việc (một harness duy nhất ở `BSN_/.claude`) nằm ở `../../CLAUDE.md` (tự nạp). **Mở phiên Claude Code ở `BSN_/`** rồi giao việc cho dịch vụ này; hook, MCP `bsn-docs` và skill chỉ nạp ở gốc, mở thẳng trong thư mục dịch vụ thì không có hook nào. Tệp này là phần riêng của dịch vụ.
+Quy tắc chung cho mọi dịch vụ và cách làm việc (một harness duy nhất ở `BSN_/.claude`) nằm ở `../../CLAUDE.md` (tự nạp). **Mở phiên Claude Code ở `BSN_/`** rồi giao việc cho dịch vụ này; hook, MCP `harness-docs` và skill chỉ nạp ở gốc, mở thẳng trong thư mục dịch vụ thì không có hook nào. Tệp này là phần riêng của dịch vụ.
 
 ## Phạm vi
 - Làm trong `system_service/ingest/`. Ngoài thư mục này chỉ đọc; việc cần dịch vụ khác thì ghi yêu cầu vào `../../docs/handoff/`.
 - Đầu phiên: đọc [docs/agent/STATUS.md](docs/agent/STATUS.md), [docs/agent/DECISIONS.md](docs/agent/DECISIONS.md), [docs/agent/CONVENTIONS.md](docs/agent/CONVENTIONS.md). Liệt kê các tệp `../../docs/handoff/*-to-ingest-*.md` còn `open` và báo người dùng.
-- Tài liệu ba tầng (design/spec/impl) chỉ ghi qua công cụ MCP `bsn-docs` với `service="ingest"` (`design_record` tạo `docs/modules` lần đầu); không sửa tay. Dịch vụ này CHƯA dùng ba tầng.
-- Trong `docs/` của dịch vụ chỉ có Markdown cho agent, không đặt HTML. Nguồn có cấu trúc của dịch vụ là `docs/service.yaml` (nghiệp vụ, kiến trúc, vấn đề và tiến độ), ghi bằng `bsn-docs`: `service_doc_set`, `problem_record`. Sơ đồ khai bằng `diagram_save`, không tự viết Mermaid. Người đọc xem cổng cục bộ `BSN_/docs/portal/ingest/index.html`, sinh tự động từ nguồn đó sau mỗi commit.
+- Tài liệu ba tầng (design/spec/impl) chỉ ghi qua công cụ MCP `harness-docs` với `service="ingest"` (`design_record`, `spec_fill`, `impl_link`); không sửa tay. Ba tầng đã có cho 9 module ở `docs/modules/`.
+- Trong `docs/` của dịch vụ chỉ có Markdown cho agent, không đặt HTML. Nguồn có cấu trúc của dịch vụ là `docs/service.yaml` (nghiệp vụ, kiến trúc, vấn đề và tiến độ), ghi bằng `harness-docs`: `service_doc_set`, `problem_record`. Sơ đồ khai bằng `diagram_save`, không tự viết Mermaid. Người đọc xem cổng cục bộ `BSN_/docs/portal/ingest/index.html`, sinh tự động từ nguồn đó sau mỗi commit.
 
 ## Đọc gì khi nào
 Tệp này là cửa vào duy nhất của dịch vụ. Thứ tự đọc chung nằm ở skill `services`; dưới đây là tài liệu riêng của ingest.
@@ -19,7 +19,8 @@ Tệp này là cửa vào duy nhất của dịch vụ. Thứ tự đọc chung 
 | Cần bức tranh chung | [docs/_generated/overview.md](docs/_generated/overview.md) (công cụ sinh từ `docs/service.yaml`) |
 | Sửa một phần cụ thể | `docs/modules/<phần>/` (auth, catalog, contract, http, intake, kafka, normalize, relay, wiring): thiết kế, đặc tả, mã và test của phần đó |
 | Mã đổi có làm sơ đồ sai không | mục "Sơ đồ" ở cuối tệp này, rồi skill `diagrams` |
-| Lên bản mới, sửa workflow | mục "CI và ghim bản mới" bên dưới, rồi skill `cicd` |
+| Lên bản mới, sửa workflow | mục "CI và khai bản mới" bên dưới, rồi skill `cicd` |
+| Sub-agent của ingest | `.harness/agents/` (reviewer: chỉ đọc, soát thay đổi; test-runner: chạy test); `.claude/` của ingest do harness sinh, không sửa tay |
 | Có ai đang chờ ingest làm gì | các tệp `../../docs/handoff/*-to-ingest-*.md` còn `open` |
 
 ## Ba lớp (nguyên tắc ở ../../CLAUDE.md)
@@ -51,12 +52,12 @@ Tệp này là cửa vào duy nhất của dịch vụ. Thứ tự đọc chung 
 - Test Kafka thật (`tests/test_kafka_rqm.py`): cần `INGEST_TEST_KAFKA_BOOTSTRAP` và `INGEST_TEST_KAFKA_CONTAINER` (tên container Kafka để `docker pause`); thiếu thì bỏ qua có nêu lý do. Cách dựng container ở `docker-compose.yml` (mục `kafka`).
 - Kiểm cấu hình: `python -m ingest.main --check-config` (cần `INGEST_DATABASE_URL`).
 - Chạy cục bộ: sao `.env.example` thành `.env`, rồi `docker compose up --build -d` (Ingest, PostgreSQL, Kafka một nút). Gửi thử: `python tools/sim/supplier.py --user ... --password ...` sau khi đăng ký đối tác và danh mục qua `/internal/v1/...`.
-- Kiểm tài liệu (từ `BSN_/`): `node .claude/plugin/mcp/cli.js --service ingest check`.
+- Kiểm tài liệu (từ `BSN_/`): `node .claude/modules/core/cli/cli.js --service ingest check`.
 
-## CI và ghim bản mới (S-023; cách làm ở skill `cicd`)
+## CI và khai bản mới (S-023, S-059; cách làm ở skill `cicd`)
 - Nhánh chính là `main`; chỉ `main` được đóng gói. Repo có `bsn.ci.json`, `.github/workflows/ci.yml` (ba job: `pin` của nền cho biết commit nào chờ đóng gói, `test` chạy trên commit đang đẩy và commit đó, `image` của nền đóng gói đúng commit đã khai) và `.dockerignore`. Trên GitHub CI chỉ chạy được test SQLite và PostgreSQL; ba ca Kafka tự bỏ qua vì cần `docker pause` broker.
 - `Dockerfile` cài thư viện từ `pyproject.toml` TRƯỚC khi chép `src`: sửa mã chỉ làm lại lớp mã. Thêm phụ thuộc thì sửa `pyproject.toml` (lớp thư viện sẽ được dựng lại).
-- **Khai báo trước, build sau (S-029):** job `image` chỉ đóng gói commit đang được ghim trong `infra/services/ingest.json`, dù commit đó là đầu nhánh hay nằm phía dưới (D-010 của nền); không có commit chờ thì lần đẩy chỉ chạy test. Thứ tự lên bản mới: (1) commit ở máy và chạy test; (2) từ `BSN_/` chạy `node infra/bsn.js pin ingest --apply`, rồi `git -C infra add services/ingest.json`, `git -C infra commit -m "ghim ingest <mã commit>"`, `git -C infra push`; (3) `git push` repo ingest: test qua thì bản `main-<12 ký tự commit>` được đóng gói. Lỡ đẩy mã trước khi ghim: ghim xong thì chạy tay `gh workflow run ci.yml -R Autonomous-SoftwareAgent/svc-ingest`. `node infra/bsn.js images` báo "CHỜ BUILD" cho commit đã ghim mà chưa có bản. Tờ `infra/services/ingest.json` thuộc repo `Autonomous-SoftwareAgent/deploy` (`BSN_/infra/`, S-028), không thuộc repo gốc. Ghim và đẩy chỉ khi người dùng bảo. Phiên ingest chỉ ghi đúng tờ của mình, không sửa phần còn lại của `infra/`.
+- **Khai báo trước, build sau (S-029), khai bằng nhãn (S-059):** chỉ commit có nhãn `release/ingest` mới được đóng gói; lần đẩy khác chỉ chạy test. Thứ tự lên bản mới: (1) commit ở máy và chạy test; (2) đẩy `main`; (3) gắn nhãn `release/ingest` lên commit đã nằm trên `main` trong repo ingest và đẩy nhãn; bản `main-<12 ký tự commit>` được đóng gói nếu test qua. Dịch vụ không ghim, không commit hay đẩy repo deploy (`pin` là cách cũ). Chi tiết từng bước và lệnh: skill `cicd`. LƯU Ý đã đọc thấy: `.github/workflows/ci.yml` (dòng 18-19) vẫn gọi job `pin` của `Autonomous-SoftwareAgent/deploy/.github/workflows/service-pin.yml@main` và ghi chú đầu tệp còn nói theo cách ghim; CHƯA kiểm workflow dùng chung đã hiểu nhãn `release/ingest` chưa. Việc đổi `ci.yml` theo S-059 là của tờ `docs/handoff/2026-10-11-infra-to-ingest-khai-ban-bang-nhan-release.md` (còn open), chưa làm trong lượt này. Đẩy GitHub, gắn nhãn, deploy chỉ khi người dùng bảo. Tờ `infra/services/ingest.json` thuộc repo `Autonomous-SoftwareAgent/deploy` (`BSN_/infra/`, S-028); phiên ingest chỉ ghi đúng tờ của mình.
 
 ## Sơ đồ (docs/diagrams/, khai bằng `diagram_save`)
 - Nghiệp vụ: `trinh-tu-nhan-lan-gui` (trình tự một lần gửi), `luong-xu-ly-tung-dong` (luồng xử lý một dòng dữ liệu).
